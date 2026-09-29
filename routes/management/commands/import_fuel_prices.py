@@ -1,60 +1,136 @@
-import openpyxl
+import csv
+
 from django.core.management.base import BaseCommand
 from routes.models import FuelStation
 
 
 class Command(BaseCommand):
-    help="import fuel prices into the db"
+    help = "Replace fuel station data with enriched CSV data"
 
-    def add_arguments(self,parser):
+    def add_arguments(self, parser):
         parser.add_argument("file_path")
 
-    def handle(self,*args,**options):
-        file_path= options["file_path"]
+    def handle(self, *args, **options):
+        file_path = options["file_path"]
 
-        workbook=openpyxl.load_workbook(
+        stations = []
+
+        with open(
             file_path,
-            read_only=True,
-            data_only=True
-        )
-        sheet = workbook.active
-        
-        stations=[]
+            mode="r",
+            encoding="cp1252",
+            newline=""
+        ) as file:
 
-        rows=sheet.iter_rows(
-                min_row=2,
-                values_only=True
-            )
+            reader = csv.DictReader(file)
 
-        for row in rows:
-            if not row or row[0] is None:
-                continue
+            for row in reader:
+                opis_id = row.get("OPIS Truckstop ID")
 
-            (opis_truckstop_id,
-                name,
-                address,
-                city,
-                state,
-                rack_id,
-                retail_price,
-            )=row
-           
-            stations.append(
-                FuelStation(
+                if not opis_id:
+                    continue
 
-                opis_truckstop_id=int(opis_truckstop_id),
-                name=str(name).strip(),
-                address=str(address).strip(),
-                city=str(city).strip(),
-                state=str(state).strip(),
-                rack_id=int(rack_id),
-                retail_price=retail_price,
+                stations.append(
+                    FuelStation(
+                        opis_truckstop_id=int(
+                            float(opis_id)
+                        ),
+
+                        name=self.clean(
+                            row.get("Truckstop Name")
+                        ),
+
+                        address=self.clean(
+                            row.get("Address")
+                        ),
+
+                        city=self.clean(
+                            row.get("City")
+                        ),
+
+                        state=self.clean(
+                            row.get("State")
+                        ),
+
+                        rack_id=self.parse_int(
+                            row.get("Rack ID")
+                        ),
+
+                        retail_price=self.parse_float(
+                            row.get("Retail Price")
+                        ),
+
+                        latitude=self.parse_float(
+                            row.get("Latitude")
+                        ),
+
+                        longitude=self.parse_float(
+                            row.get("Longitude")
+                        ),
+
+                        geocode_status=self.clean(
+                            row.get("match_status")
+                        ),
+
+                        geocode_match_type=self.clean(
+                            row.get("match_type")
+                        ),
+                    )
                 )
-            )
 
-        FuelStation.objects.bulk_create(stations)
+        existing_count = FuelStation.objects.count()
+
         self.stdout.write(
-        self.style.SUCCESS(
-            f"Imported {len(stations)} fuel stations"
+            f"Deleting {existing_count} existing "
+            f"fuel stations..."
         )
+
+        FuelStation.objects.all().delete()
+
+        FuelStation.objects.bulk_create(
+            stations,
+            batch_size=500
         )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Imported {len(stations)} fuel stations"
+            )
+        )
+
+    @staticmethod
+    def clean(value):
+        if value is None:
+            return ""
+
+        return str(value).strip()
+
+    @staticmethod
+    def parse_int(value):
+        if value is None:
+            return None
+
+        value = str(value).strip()
+
+        if not value:
+            return None
+
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def parse_float(value):
+        if value is None:
+            return None
+
+        value = str(value).strip()
+
+        if not value:
+            return None
+
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
