@@ -1,3 +1,7 @@
+import hashlib
+from django.conf import settings
+from django.core.cache import cache
+
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,6 +22,12 @@ from .models import FuelStation
 from .serializers import OptimizeRouteSerializer
 
 
+def get_route_cache_key(start: str, finish: str) -> str:
+    norm = f"{start.strip().lower()}|{finish.strip().lower()}"
+    digest = hashlib.sha256(norm.encode("utf-8")).hexdigest()
+    return f"route_opt:{digest}"
+
+
 class HealthView(APIView):
     def get(self, request):
         return Response({
@@ -35,8 +45,15 @@ class OptimizeRouteView(APIView):
 
         serializer.is_valid(raise_exception=True)
 
-        start_location = serializer.validated_data["start"]
-        finish_location = serializer.validated_data["finish"]
+        start_location = serializer.validated_data["start"].strip()
+        finish_location = serializer.validated_data["finish"].strip()
+
+        cache_key = get_route_cache_key(start_location, finish_location)
+        cached_entry = cache.get(cache_key)
+        if cached_entry is not None:
+            resp = Response(cached_entry["data"], status=cached_entry["status"])
+            resp["X-Cache"] = "HIT"
+            return resp
 
         try:
             # 1. Geocode user locations
@@ -109,25 +126,35 @@ class OptimizeRouteView(APIView):
                 )
             )
 
+            cache_ttl = getattr(settings, "ROUTE_CACHE_TTL", 300)
+
             # 8. No feasible route
             if optimization_result is None:
-                return Response(
-                    {
-                        "error": "No feasible fuel-stop plan exists for this route.",
-                        "route": {
-                            "distance_miles": round(distance_miles, 2),
-                            "duration_minutes": round(
-                                route["duration_seconds"] / 60,
-                                2,
-                            ),
-                        },
+                err_data = {
+                    "error": "No feasible fuel-stop plan exists for this route.",
+                    "route": {
+                        "distance_miles": round(distance_miles, 2),
+                        "duration_minutes": round(
+                            route["duration_seconds"] / 60,
+                            2,
+                        ),
                     },
+                }
+                cache.set(
+                    cache_key,
+                    {"data": err_data, "status": status.HTTP_422_UNPROCESSABLE_ENTITY},
+                    timeout=cache_ttl,
+                )
+                resp = Response(
+                    err_data,
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
+                resp["X-Cache"] = "MISS"
+                return resp
 
             fuel_consumed = distance_miles / 10
 
-            return Response({
+            response_data = {
                 "start": start,
                 "finish": finish,
 
@@ -166,7 +193,17 @@ class OptimizeRouteView(APIView):
                 "legs": (
                     optimization_result["legs"]
                 ),
-            })
+            }
+
+            cache.set(
+                cache_key,
+                {"data": response_data, "status": status.HTTP_200_OK},
+                timeout=cache_ttl,
+            )
+
+            resp = Response(response_data, status=status.HTTP_200_OK)
+            resp["X-Cache"] = "MISS"
+            return resp
 
         except ValueError as exc:
             return Response(

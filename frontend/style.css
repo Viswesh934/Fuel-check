@@ -1,0 +1,399 @@
+:root {
+    --bg: #080b0d;
+    --panel: #101518;
+    --panel-2: #151c20;
+    --border: #263136;
+
+    --text: #edf2f2;
+    --muted: #7e8b90;
+
+    --accent: #b8f35a;
+    --accent-dark: #8dbd35;
+
+    --danger: #ff6b6b;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        sans-serif;
+}
+
+.app {
+    min-height: 100vh;
+}
+
+.header {
+    height: 72px;
+    padding: 0 32px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    border-bottom: 1px solid var(--border);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-icon {
+    width: 38px;
+    height: 38px;
+
+    display: grid;
+    place-items: center;
+
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.brand h1 {
+    margin: 0;
+    font-size: 15px;
+    letter-spacing: 2px;
+}
+
+.brand span {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 3px;
+}
+
+.status {
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 1px;
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.status-dot.offline {
+    background: var(--danger);
+}
+
+main {
+    padding: 24px;
+}
+
+.hero {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+
+    min-height: 570px;
+}
+
+.planner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 32px;
+}
+
+.section-label {
+    color: var(--accent);
+    font-size: 10px;
+    letter-spacing: 2px;
+    font-weight: 700;
+}
+
+.planner h2 {
+    font-size: 30px;
+    line-height: 1.1;
+    margin: 18px 0 12px;
+}
+
+.description {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 32px;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+label {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+}
+
+input {
+    display: block;
+    width: 100%;
+
+    margin-top: 8px;
+    padding: 14px;
+
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+
+    color: var(--text);
+    outline: none;
+}
+
+input:focus {
+    border-color: var(--accent);
+}
+
+button {
+    margin-top: 12px;
+
+    padding: 15px;
+
+    border: 0;
+    background: var(--accent);
+    color: #101510;
+
+    font-weight: 800;
+    cursor: pointer;
+
+    display: flex;
+    justify-content: space-between;
+}
+
+button:hover {
+    background: #d0ff82;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.map-wrapper {
+    position: relative;
+
+    min-height: 570px;
+
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    min-height: 570px;
+}
+
+.map-loading {
+    position: absolute;
+
+    inset: 0;
+
+    display: grid;
+    place-items: center;
+
+    background: rgba(8, 11, 13, 0.7);
+
+    z-index: 1000;
+
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 2px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.error {
+    margin-top: 18px;
+    padding: 12px;
+
+    border: 1px solid var(--danger);
+    color: var(--danger);
+
+    font-size: 12px;
+}
+
+.results {
+    margin-top: 16px;
+}
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+
+    background: var(--border);
+    border: 1px solid var(--border);
+}
+
+.metric {
+    background: var(--panel);
+    padding: 22px;
+}
+
+.metric span {
+    display: block;
+
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+}
+
+.metric strong {
+    display: block;
+
+    margin-top: 8px;
+
+    font-size: 24px;
+}
+
+.metric.highlight strong {
+    color: var(--accent);
+}
+
+.stops-section {
+    margin-top: 16px;
+
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 24px;
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-heading h3 {
+    margin: 6px 0 20px;
+    font-size: 22px;
+}
+
+.stop {
+    display: grid;
+    grid-template-columns: 50px 1fr 120px 120px;
+
+    align-items: center;
+
+    padding: 16px;
+
+    border-top: 1px solid var(--border);
+}
+
+.stop-empty {
+    padding: 24px 16px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+}
+
+.stop-number {
+    color: var(--accent);
+    font-weight: 800;
+}
+
+.stop-name {
+    font-weight: 600;
+}
+
+.stop-location {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.stop-price {
+    font-weight: 700;
+}
+
+.stop-distance {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: right;
+}
+
+/* Leaflet dark theme customization */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.leaflet-popup-content {
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 12px 14px;
+}
+
+.leaflet-popup-content strong {
+    color: var(--accent);
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+    color: var(--muted);
+    padding: 6px 6px 0 0;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+    color: var(--text);
+}
+
+.leaflet-bar a {
+    background-color: var(--panel);
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+}
+
+.leaflet-bar a:hover {
+    background-color: var(--panel-2);
+    color: var(--accent);
+}
+
+@media (max-width: 900px) {
+
+    .hero {
+        grid-template-columns: 1fr;
+    }
+
+    .metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stop {
+        grid-template-columns: 40px 1fr;
+        gap: 10px;
+    }
+
+    .stop-price,
+    .stop-distance {
+        text-align: left;
+        grid-column: 2;
+    }
+
+}

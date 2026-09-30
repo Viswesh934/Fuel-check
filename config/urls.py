@@ -16,9 +16,16 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import include,path
+from django.urls import include, path, re_path
+from django.views.static import serve
+from django.conf import settings
+
+FRONTEND_DIR = settings.BASE_DIR / "frontend"
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include("routes.urls"))
+    path("api/", include("routes.urls")),
+    path("", lambda req: serve(req, "index.html", document_root=FRONTEND_DIR), name="frontend-home"),
+    re_path(r"^(?P<path>.*\.(html|css|js|png|svg|ico|json))$", serve, {"document_root": FRONTEND_DIR}),
 ]
+

@@ -45,6 +45,8 @@ def build_optimization_result(result, nodes, graph):
                 "name": station.name,
                 "city": station.city,
                 "state": station.state,
+                "latitude": station.latitude,
+                "longitude": station.longitude,
                 "price_per_gallon": float(
                     station.retail_price
                 ),

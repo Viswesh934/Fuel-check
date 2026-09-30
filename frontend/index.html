@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Route Fuel Optimizer</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+<div class="app">
+
+    <header class="header">
+        <div class="brand">
+            <div class="brand-icon">⬡</div>
+            <div>
+                <h1>ROUTE FUEL</h1>
+                <span>OPTIMIZER</span>
+            </div>
+        </div>
+
+        <div class="status">
+            <span class="status-dot"></span>
+            <span id="api-status-text">API ONLINE</span>
+        </div>
+    </header>
+
+
+    <main>
+
+        <section class="hero">
+
+            <div class="planner">
+
+                <div class="section-label">
+                    ROUTE PLANNER
+                </div>
+
+                <h2>
+                    Find the most cost-efficient
+                    fuel stops.
+                </h2>
+
+                <p class="description">
+                    Plan a route using your vehicle's
+                    500-mile maximum range and current
+                    fuel prices.
+                </p>
+
+                <form id="route-form">
+
+                    <label>
+                        START LOCATION
+                        <input
+                            id="start"
+                            type="text"
+                            placeholder="New York, NY"
+                            required
+                        >
+                    </label>
+
+                    <label>
+                        DESTINATION
+                        <input
+                            id="finish"
+                            type="text"
+                            placeholder="Chicago, IL"
+                            required
+                        >
+                    </label>
+
+                    <button type="submit">
+                        CALCULATE ROUTE
+                        <span>→</span>
+                    </button>
+
+                </form>
+
+                <div id="error" class="error hidden"></div>
+
+            </div>
+
+
+            <div class="map-wrapper">
+
+                <div id="map"></div>
+
+                <div id="loading" class="map-loading hidden">
+                    CALCULATING ROUTE...
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <section id="results" class="results hidden">
+
+            <div class="metrics">
+
+                <div class="metric">
+                    <span>DISTANCE</span>
+                    <strong id="distance">—</strong>
+                </div>
+
+                <div class="metric">
+                    <span>DRIVE TIME</span>
+                    <strong id="duration">—</strong>
+                </div>
+
+                <div class="metric">
+                    <span>FUEL USED</span>
+                    <strong id="fuel-used">—</strong>
+                </div>
+
+                <div class="metric highlight">
+                    <span>TOTAL FUEL COST</span>
+                    <strong id="fuel-cost">—</strong>
+                </div>
+
+            </div>
+
+
+            <div class="stops-section">
+
+                <div class="section-heading">
+                    <div>
+                        <span class="section-label">
+                            OPTIMIZED PLAN
+                        </span>
+
+                        <h3>Fuel Stops</h3>
+                    </div>
+
+                    <div id="stop-count"></div>
+                </div>
+
+                <div id="stops-list"></div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./app.js"></script>
+
+</body>
+</html>
