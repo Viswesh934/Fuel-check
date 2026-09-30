@@ -48,25 +48,25 @@ def build_optimization_result(result, nodes, graph):
                 "price_per_gallon": float(
                     station.retail_price
                 ),
-                "route_mile": current_node["route_mile"],
-                "gallons": gallons,
-                "cost": cost,
+                "route_mile": round(current_node["route_mile"], 2),
+                "gallons": round(gallons, 2),
+                "cost": round(cost, 2),
             })
 
         legs.append({
             "from": current_id,
             "to": next_id,
-            "distance_miles": distance,
-            "gallons": gallons,
-            "fuel_cost": cost,
+            "distance_miles": round(distance, 2),
+            "gallons": round(gallons, 2),
+            "fuel_cost": round(cost, 2),
         })
 
     return {
         "path": path,
         "stops": stops,
         "legs": legs,
-        "total_gallons_purchased": total_gallons_purchased,
-        "total_cost": result["cost"],
+        "total_gallons_purchased": round(total_gallons_purchased, 2),
+        "total_cost": round(result["cost"], 2),
     }
 
 def optimize_route(nodes, graph):

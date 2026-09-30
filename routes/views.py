@@ -1,3 +1,4 @@
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -14,6 +15,7 @@ from routes.services.optimizer import (
     build_optimization_result,
 )
 from .models import FuelStation
+from .serializers import OptimizeRouteSerializer
 
 
 class HealthView(APIView):
@@ -23,108 +25,161 @@ class HealthView(APIView):
         })
 
 
-class DbCheckView(APIView):
-    def get(self, request):
-        records = FuelStation.objects.all()
+class OptimizeRouteView(APIView):
 
-        return Response({
-            "connected": True,
-            "records": [
-                {
-                    "id": record.id,
-                    "name": record.name
-                }
-                for record in records
-            ]
-        })
+    def post(self, request):
 
-
-class RouteTestView(APIView):
-    def get(self, request):
-
-        geocoder = GeocodingService()
-        router = RoutingService()
-
-        start = geocoder.geocode("New York, NY")
-        finish = geocoder.geocode("Chicago, IL")
-
-        route = router.get_route(
-            (start["longitude"], start["latitude"]),
-            (finish["longitude"], finish["latitude"]),
+        serializer = OptimizeRouteSerializer(
+            data=request.data
         )
 
-        distance_miles = route["distance_meters"] / 1609.344
+        serializer.is_valid(raise_exception=True)
 
-        route_points = build_route_points(
-            route["geometry"],
-            distance_miles,
-        )
+        start_location = serializer.validated_data["start"]
+        finish_location = serializer.validated_data["finish"]
 
-        stations = FuelStation.objects.filter(
-            latitude__isnull=False,
-            longitude__isnull=False,
-        )
+        try:
+            # 1. Geocode user locations
+            geocoder = GeocodingService()
 
-        candidates = find_candidate_stations(
-            stations,
-            route_points,
-        )
-        nodes = build_route_nodes(
-            candidates,
-            distance_miles,
-        )
+            start = geocoder.geocode(
+                start_location
+            )
 
-        graph = build_route_graph(nodes)
+            finish = geocoder.geocode(
+                finish_location
+            )
 
-        result = optimize_route(
-            nodes,
-            graph,
-        )
+            # 2. Get route
+            router = RoutingService()
 
-        optimization = optimize_route(
-            nodes,
-            graph,
-        )
+            route = router.get_route(
+                (
+                    start["longitude"],
+                    start["latitude"],
+                ),
+                (
+                    finish["longitude"],
+                    finish["latitude"],
+                ),
+            )
 
-        optimization_result = build_optimization_result(
-            optimization,
-            nodes,
-            graph,
-        )
+            distance_miles = (
+                route["distance_meters"] / 1609.344
+            )
 
-        return Response({
-            "start": start,
-            "finish": finish,
-            "distance_miles": distance_miles,
-            "duration_minutes": route["duration_seconds"] / 60,
-            "route_point_count": len(route_points),
-            "candidate_station_count": len(candidates),
-            "candidates": [
-                {
-                    "id": candidate["station"].id,
-                    "name": candidate["station"].name,
-                    "city": candidate["station"].city,
-                    "state": candidate["station"].state,
-                    "price": float(
-                        candidate["station"].retail_price
+            # 3. Convert route geometry
+            route_points = build_route_points(
+                route["geometry"],
+                distance_miles,
+            )
+
+            # 4. Find fuel stations near route
+            stations = FuelStation.objects.filter(
+                latitude__isnull=False,
+                longitude__isnull=False,
+            )
+
+            candidates = find_candidate_stations(
+                stations,
+                route_points,
+                tolerance_miles=5.0,
+            )
+
+            # 5. Build reachability graph
+            nodes = build_route_nodes(
+                candidates,
+                distance_miles,
+            )
+
+            graph = build_route_graph(nodes)
+
+            # 6. Find cheapest reachable path
+            optimization = optimize_route(
+                nodes,
+                graph,
+            )
+
+            # 7. Format result
+            optimization_result = (
+                build_optimization_result(
+                    optimization,
+                    nodes,
+                    graph,
+                )
+            )
+
+            # 8. No feasible route
+            if optimization_result is None:
+                return Response(
+                    {
+                        "error": "No feasible fuel-stop plan exists for this route.",
+                        "route": {
+                            "distance_miles": round(distance_miles, 2),
+                            "duration_minutes": round(
+                                route["duration_seconds"] / 60,
+                                2,
+                            ),
+                        },
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
+            fuel_consumed = distance_miles / 10
+
+            return Response({
+                "start": start,
+                "finish": finish,
+
+                "route": {
+                    "distance_miles": round(distance_miles, 2),
+                    "duration_minutes": round(
+                        route["duration_seconds"] / 60,
+                        2,
                     ),
-                    "route_mile": candidate["route_mile"],
-                    "distance_to_route": candidate[
-                        "distance_to_route"
-                    ],
-                }
-                for candidate in candidates
-            ],
-            "graph": {
-            "nodes": [
+                    "geometry": route["geometry"],
+                },
+
+                "fuel": {
+                    "mpg": 10,
+                    "max_range_miles": 500,
+                    "consumed_gallons": round(fuel_consumed, 2),
+                    "starting_fuel_gallons": 50,
+                    "modeled_purchased_gallons": round(
+                        optimization_result[
+                            "total_gallons_purchased"
+                        ],
+                        2,
+                    ),
+                    "total_cost": round(
+                        optimization_result[
+                            "total_cost"
+                        ],
+                        2,
+                    ),
+                },
+
+                "fuel_stops": (
+                    optimization_result["stops"]
+                ),
+
+                "legs": (
+                    optimization_result["legs"]
+                ),
+            })
+
+        except ValueError as exc:
+            return Response(
                 {
-                    "id": node["id"],
-                    "type": node["type"],
-                    "route_mile": node["route_mile"],
-                }
-                for node in nodes
-            ],
-            "edges": graph,
-            "optimization": optimization_result,
-        },
-        })
+                    "error": str(exc)
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except Exception as exc:
+            return Response(
+                {
+                    "error": "Unable to calculate route."
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
