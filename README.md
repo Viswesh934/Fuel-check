@@ -69,11 +69,11 @@ N_0 (\text{START}) < N_1 < N_2 < \dots < N_k (\text{FINISH})
 ```
 
 A directed edge $(u, v)$ is added if and only if:
-1. $u$ precedes $v$ along the route: $\text{route\_mile}(u) < \text{route\_mile}(v)$ (guaranteeing a Directed Acyclic Graph).
+1. $u$ precedes $v$ along the route: $\text{mile}(u) < \text{mile}(v)$ (guaranteeing a Directed Acyclic Graph).
 2. The distance satisfies vehicle reachability:
 
 ```math
-\text{distance}(u, v) = \text{route\_mile}(v) - \text{route\_mile}(u) \le 500\text{ miles}
+\text{distance}(u, v) = \text{mile}(v) - \text{mile}(u) \le 500\text{ miles}
 ```
 
 ```mermaid
@@ -81,7 +81,7 @@ graph LR
     START["START<br/>(mile 0.0)"] -->|475.6 mi| S1["Loves #275<br/>(mile 475.6)"]
     S1 -->|154.4 mi| S2["Truckomat<br/>(mile 630.0)"]
     S2 -->|29.1 mi| FINISH["FINISH<br/>(mile 659.1)"]
-    S1 -.->|183.5 mi (alternative)| FINISH
+    S1 -.->|"183.5 mi (alternative)"| FINISH
 
     style START fill:#151c20,stroke:#263136,color:#edf2f2
     style S1 fill:#151c20,stroke:#b8f35a,stroke-width:2px,color:#edf2f2
@@ -99,17 +99,17 @@ Because the graph is a topological DAG ordered by `route_mile`, the minimum-cost
     - Leg fuel cost:
 
 ```math
-\text{fuel\_cost} = 
+\text{fuel cost} = 
 \begin{cases} 
 0.0 & \text{if } u = \text{START (vehicle starts full)} \\ 
-g \times \text{retail\_price}(u) & \text{if } u \text{ is a station} 
+g \times \text{retail price}(u) & \text{if } u \text{ is a station} 
 \end{cases}
 ```
 
-    - If $\text{cost}[u] + \text{fuel\_cost} < \text{cost}[v]$:
+    - If $\text{cost}[u] + \text{fuel cost} < \text{cost}[v]$:
 
 ```math
-\text{cost}[v] = \text{cost}[u] + \text{fuel\_cost}, \quad \text{predecessor}[v] = u
+\text{cost}[v] = \text{cost}[u] + \text{fuel cost}, \quad \text{predecessor}[v] = u
 ```
 
 If $\text{cost}[\text{FINISH}] = \infty$, no sequence of stations exists where every gap is $\le 500$ miles; the API returns **HTTP 422 Unprocessable Entity**.
@@ -444,7 +444,7 @@ flowchart LR
         
         UI --> APP
         APP --> MAP
-        APP -->|fetch /api/*| SW
+        APP -->|"fetch /api/*"| SW
     end
     
     subgraph Backend ["Django REST API"]
@@ -456,7 +456,7 @@ flowchart LR
         API --> OPT
     end
     
-    SW -->|Same-Origin Proxy| API
+    SW -->|"Same-Origin Proxy"| API
 
     style Browser fill:#101518,stroke:#263136,color:#edf2f2
     style Backend fill:#101518,stroke:#263136,color:#edf2f2
