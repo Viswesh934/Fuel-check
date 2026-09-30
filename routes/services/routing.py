@@ -1,26 +1,17 @@
-# routes/services/routing.py
-
 import requests
 from django.conf import settings
 
 
 class RoutingService:
-    BASE_URL = "https://api.openrouteservice.org/v2/directions/driving-car"
+    BASE_URL = (
+        "https://api.heigit.org/"
+        "openrouteservice/v2/directions/driving-car/geojson"
+    )
 
     def __init__(self):
         self.api_key = settings.ORS_API_KEY
 
     def get_route(self, start, finish):
-        """
-        start  = (longitude, latitude)
-        finish = (longitude, latitude)
-
-        Returns:
-            distance_meters
-            duration_seconds
-            geometry
-        """
-
         coordinates = [
             list(start),
             list(finish),
@@ -31,6 +22,7 @@ class RoutingService:
             headers={
                 "Authorization": self.api_key,
                 "Content-Type": "application/json",
+                "Accept": "application/geo+json",
             },
             json={
                 "coordinates": coordinates,
@@ -43,10 +35,10 @@ class RoutingService:
 
         data = response.json()
 
-        route = data["routes"][0]
+        route = data["features"][0]
 
         return {
-            "distance_meters": route["summary"]["distance"],
-            "duration_seconds": route["summary"]["duration"],
+            "distance_meters": route["properties"]["summary"]["distance"],
+            "duration_seconds": route["properties"]["summary"]["duration"],
             "geometry": route["geometry"],
         }
