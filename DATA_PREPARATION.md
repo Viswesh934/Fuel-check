@@ -52,8 +52,32 @@ Processing commercial truck stop addresses through the Census API required resol
 
 ## 4. Batch Submission & Coordinate Extraction
 
+```mermaid
+flowchart TD
+    A["Raw OPIS Dataset<br/>(8,151 rows)"] --> B["1. Encoding Normalization<br/>(CP1252 / Latin-1 &rarr; UTF-8)"]
+    B --> C["2. Address Sanitization<br/>(Strip unescaped quotes & whitespace)"]
+    C --> D["3. Filter US Records<br/>(Exclude Canadian provinces)"]
+    D --> E["4. Chunking<br/>(500 rows per batch)"]
+    E --> F["5. US Census Batch Geocoder<br/>(Multipart upload with retry backoff)"]
+    F --> G["6. Parse Coordinates<br/>(Longitude, Latitude extraction)"]
+    G --> H["7. Merge by Internal Row ID"]
+    H --> I["fuel_prices_with_coordinates.csv<br/>(588 Geocoded Stations)"]
+
+    style A fill:#151c20,stroke:#263136,color:#edf2f2
+    style B fill:#151c20,stroke:#263136,color:#edf2f2
+    style C fill:#151c20,stroke:#263136,color:#edf2f2
+    style D fill:#151c20,stroke:#263136,color:#edf2f2
+    style E fill:#151c20,stroke:#263136,color:#edf2f2
+    style F fill:#151c20,stroke:#263136,color:#edf2f2
+    style G fill:#151c20,stroke:#263136,color:#edf2f2
+    style H fill:#151c20,stroke:#263136,color:#edf2f2
+    style I fill:#151c20,stroke:#b8f35a,stroke-width:2px,color:#edf2f2
+```
+
 1. **Census 5-Column Batch Specification:** Input data was formatted without headers as:
-   $$\text{Row ID, Street/Address, City, State, ZIP (blank)}$$
+   ```text
+   Row ID, Street/Address, City, State, ZIP (blank)
+   ```
 2. **Response Parsing:**
    The Census engine returns structured CSV with the following key fields:
    * `match_status`: `Match`, `No_Match`, `Tie`

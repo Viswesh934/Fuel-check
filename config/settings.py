@@ -29,8 +29,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-vz!lia-+r-24$+s_v8h-(i@#9+b*mw_@#ek=#c+m3vkuhjzm%t"
 
-#ENV vars
+# ENV vars
 ORS_API_KEY = os.environ.get("ORS_API_KEY")
+
+# Cache Configuration (Small TTL for route optimization responses)
+ROUTE_CACHE_TTL = int(os.environ.get("ROUTE_CACHE_TTL", 300))  # 5 minutes default
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "fuel-check-route-cache",
+        "TIMEOUT": ROUTE_CACHE_TTL,
+    }
+}
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -47,11 +58,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "routes",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -60,6 +73,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = "config.urls"
 

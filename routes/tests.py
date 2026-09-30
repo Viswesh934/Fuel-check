@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from django.test import TestCase
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -148,8 +149,8 @@ class RouteGraphAndOptimizationTests(TestCase):
         Leg from station to FINISH is 300 miles (30 gallons).
         Expected choice: Station Cheap.
         """
-        station_expensive = MagicMock(id=1, name="Expensive Gas", city="CityA", state="IL", retail_price=4.50)
-        station_cheap = MagicMock(id=2, name="Cheap Gas", city="CityB", state="IL", retail_price=2.80)
+        station_expensive = MagicMock(id=1, name="Expensive Gas", city="CityA", state="IL", retail_price=4.50, latitude=40.1, longitude=-88.1)
+        station_cheap = MagicMock(id=2, name="Cheap Gas", city="CityB", state="IL", retail_price=2.80, latitude=40.2, longitude=-88.2)
 
         nodes = [
             {"id": "START", "type": "start", "route_mile": 0.0},
@@ -165,6 +166,8 @@ class RouteGraphAndOptimizationTests(TestCase):
         self.assertEqual(res["path"], ["START", "STATION_CHP", "FINISH"])
         self.assertEqual(len(res["stops"]), 1)
         self.assertEqual(res["stops"][0]["id"], 2)
+        self.assertEqual(res["stops"][0]["latitude"], 40.2)
+        self.assertEqual(res["stops"][0]["longitude"], -88.2)
         # 300 miles / 10 mpg = 30 gallons * $2.80 = $84.00
         self.assertAlmostEqual(res["total_cost"], 84.00, places=2)
         self.assertAlmostEqual(res["total_gallons_purchased"], 30.00, places=2)
@@ -207,6 +210,7 @@ class RouteGraphAndOptimizationTests(TestCase):
 
 class OptimizeRouteAPITests(TestCase):
     def setUp(self):
+        cache.clear()
         self.client = APIClient()
 
     def test_missing_start_or_finish_returns_400(self):
@@ -304,6 +308,8 @@ class OptimizeRouteAPITests(TestCase):
                     "name": "Midway Station",
                     "city": "SampleCity",
                     "state": "IL",
+                    "latitude": 39.5,
+                    "longitude": -89.2,
                     "price_per_gallon": 3.30,
                     "route_mile": 475.0,
                     "gallons": 18.34,
@@ -332,4 +338,70 @@ class OptimizeRouteAPITests(TestCase):
         self.assertEqual(fuel["modeled_purchased_gallons"], 18.34)
         self.assertEqual(fuel["total_cost"], 60.63)
         self.assertEqual(len(res.data["fuel_stops"]), 1)
+        self.assertEqual(res.data["fuel_stops"][0]["latitude"], 39.5)
+        self.assertEqual(res.data["fuel_stops"][0]["longitude"], -89.2)
         self.assertEqual(len(res.data["legs"]), 2)
+
+    def test_cors_headers_allowed(self):
+        res = self.client.options(
+            "/api/v1/routes/optimize/",
+            HTTP_ORIGIN="http://127.0.0.1:5500",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.headers.get("Access-Control-Allow-Origin"), "*")
+
+    @patch("routes.views.build_optimization_result")
+    @patch("routes.views.optimize_route")
+    @patch("routes.views.RoutingService")
+    @patch("routes.views.GeocodingService")
+    def test_repeated_request_uses_cache_and_skips_external_calls(
+        self,
+        mock_geocoder_cls,
+        mock_router_cls,
+        mock_optimize_route,
+        mock_build_result,
+    ):
+        mock_geocoder = mock_geocoder_cls.return_value
+        mock_geocoder.geocode.side_effect = [
+            {"longitude": -87.66, "latitude": 41.88, "label": "Chicago, IL"},
+            {"longitude": -92.35, "latitude": 34.71, "label": "Little Rock, AR"},
+        ]
+
+        mock_router = mock_router_cls.return_value
+        mock_router.get_route.return_value = {
+            "distance_meters": 659.07 * 1609.344,
+            "duration_seconds": 38965,
+            "geometry": {"type": "LineString", "coordinates": [[-87.66, 41.88], [-92.35, 34.71]]},
+        }
+
+        mock_optimize_route.return_value = {"cost": 60.63, "path": ["START", "STATION_1", "FINISH"]}
+        mock_build_result.return_value = {
+            "path": ["START", "STATION_1", "FINISH"],
+            "stops": [],
+            "legs": [],
+            "total_gallons_purchased": 0.0,
+            "total_cost": 60.63,
+        }
+
+        payload = {"start": "Chicago, IL", "finish": "Little Rock, AR"}
+
+        # 1. First request -> MISS (calls geocoding & routing)
+        res1 = self.client.post("/api/v1/routes/optimize/", payload, format="json")
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertEqual(res1.headers.get("X-Cache"), "MISS")
+        self.assertEqual(mock_router.get_route.call_count, 1)
+
+        # 2. Second request with different casing/spacing -> HIT (uses cache, zero new external calls)
+        res2 = self.client.post(
+            "/api/v1/routes/optimize/",
+            {"start": "  chicago, il  ", "finish": "Little Rock, AR"},
+            format="json",
+        )
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        self.assertEqual(res2.headers.get("X-Cache"), "HIT")
+        # Ensure external services were NOT called a second time
+        self.assertEqual(mock_router.get_route.call_count, 1)
+        self.assertEqual(res1.data, res2.data)
+
+
