@@ -385,14 +385,30 @@ OK
 
 ---
 
-## 9. Setup & Local Development
+## 9. Setup & Environment Variables
 
-### Prerequisites
-- Python 3.11+
-- SQLite or PostgreSQL
-- OpenRouteService API key
+### Environment Variables (.env)
+Copy the provided `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
 
-### Installation
+| Variable | Default | Purpose / Options |
+| :--- | :--- | :--- |
+| `ROUTING_PROVIDER` | `osrm` | `osrm` (free, zero API key), `mapbox`, `geoapify`, or `ors` |
+| `GEOCODING_PROVIDER` | `nominatim` | `nominatim` (free, zero API key), `photon`, `mapbox`, `geoapify` |
+| `FUEL_STATION_PROVIDER` | `corridor` | `corridor` (dynamic US highway travel plazas), `database`, `live` |
+| `TRAVEL_EVENTS_SOURCE` | `both` | `simulated`, `live`, or `both` |
+| `AWS_ACCESS_KEY_ID` | `""` | AWS Bedrock credential for conditional AI travel advisory |
+| `AWS_SECRET_ACCESS_KEY` | `""` | AWS Bedrock credential |
+| `AWS_DEFAULT_REGION` | `us-east-1` | AWS Bedrock region |
+| `BEDROCK_MODEL_ID` | `amazon.nova-micro-v1:0`| Bedrock model ID (`amazon.nova-micro-v1:0`, Claude, etc.) |
+| `BOLNA_API_KEY` | `""` | Bolna voice agent integration key |
+| `BOLNA_AGENT_ID` | `""` | Bolna agent ID |
+| `ROUTE_CACHE_TTL` | `300` | In-memory cache TTL in seconds |
+| `DJANGO_DEBUG` | `True` | Django debug mode |
+
+### Quickstart Installation
 ```bash
 # Clone repository
 git clone https://github.com/your-username/Fuel-check.git
@@ -401,21 +417,33 @@ cd Fuel-check
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables
-export ORS_API_KEY="your-openrouteservice-api-key"
+# Configure environment variables (works immediately with zero API keys!)
+cp .env.example .env
 
 # Apply database migrations
 python manage.py migrate
 
-# (Optional) Import fuel stations CSV
-python manage.py import_fuel_prices fuel_prices_with_coordinates.csv
-
-# Run test suite
+# Run test suite (25 automated unit tests)
 python manage.py test
 
 # Start development server
 python manage.py runserver
 ```
+
+---
+
+## 10. Travel-Awareness Co-Pilot & Bolna Voice Agent
+
+Fuel Check extends beyond route fuel optimization into a **travel-awareness co-pilot** answering:
+1. **Where should I refuel, and how much might it cost?**
+2. **What should I know about the road ahead?**
+
+### Features:
+- **Zero-Key Routing & Geocoding:** Replaced offline OpenRouteService with OSRM (driving directions) and Nominatim/OpenStreetMap (geocoding).
+- **Non-Hardcoded SQL:** Replaced static SQLite table dependencies with a dynamic corridor station provider that realistically samples branded travel plazas (Love's, Pilot, TA, Buc-ee's) along any US highway.
+- **Deterministic Event Matching:** Backend evaluates road closures, severe weather, and disruptions using spatial segment projection in Python (no LLM cost).
+- **Conditional AI (AWS Bedrock / Amazon Nova Micro):** **No matching condition means zero LLM calls**. AI is called conditionally only when hazards affect the traveler or when asking conversational questions.
+- **Bolna Voice Interface:** Spoken interaction endpoint (`POST /api/v1/voice/query/`) and tool-execution webhook (`POST /api/v1/bolna/webhook/`) grounded in Fuel Check backend truth.
 
 ---
 

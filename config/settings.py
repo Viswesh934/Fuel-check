@@ -27,10 +27,31 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-vz!lia-+r-24$+s_v8h-(i@#9+b*mw_@#ek=#c+m3vkuhjzm%t"
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-vz!lia-+r-24$+s_v8h-(i@#9+b*mw_@#ek=#c+m3vkuhjzm%t")
 
-# ENV vars
+# Routing & Geocoding configuration (OSRM & Nominatim by default, no API keys required)
+ROUTING_PROVIDER = os.environ.get("ROUTING_PROVIDER", "osrm").lower()
+GEOCODING_PROVIDER = os.environ.get("GEOCODING_PROVIDER", "nominatim").lower()
 ORS_API_KEY = os.environ.get("ORS_API_KEY")
+MAPBOX_ACCESS_TOKEN = os.environ.get("MAPBOX_ACCESS_TOKEN", "")
+GEOAPIFY_API_KEY = os.environ.get("GEOAPIFY_API_KEY", "")
+
+# Fuel Station Sourcing (Dynamic corridor generator replaces hardcoded SQL data)
+FUEL_STATION_PROVIDER = os.environ.get("FUEL_STATION_PROVIDER", "corridor").lower()
+FUEL_API_KEY = os.environ.get("FUEL_API_KEY", "")
+
+# Travel Events & Awareness
+TRAVEL_EVENTS_SOURCE = os.environ.get("TRAVEL_EVENTS_SOURCE", "both").lower()
+
+# AWS Bedrock Configuration (Conditional AI / Amazon Nova Micro)
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-1"))
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0")
+
+# Bolna Voice Agent Configuration
+BOLNA_API_KEY = os.environ.get("BOLNA_API_KEY", "")
+BOLNA_AGENT_ID = os.environ.get("BOLNA_AGENT_ID", "")
 
 # Cache Configuration (Small TTL for route optimization responses)
 ROUTE_CACHE_TTL = int(os.environ.get("ROUTE_CACHE_TTL", 300))  # 5 minutes default

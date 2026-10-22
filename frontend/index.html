@@ -2,21 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Route Fuel Optimizer</title>
-
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel Check</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="./style.css">
 </head>
-
 <body>
 
 <div class="app">
@@ -25,90 +15,65 @@
         <div class="brand">
             <div class="brand-icon">⬡</div>
             <div>
-                <h1>ROUTE FUEL</h1>
-                <span>OPTIMIZER</span>
+                <h1>FUEL CHECK</h1>
+                <span>TRAVEL AWARENESS & FUEL CO-PILOT</span>
             </div>
         </div>
 
         <div class="status">
             <span class="status-dot"></span>
-            <span id="api-status-text">API ONLINE</span>
+            <span id="api-status-text">SYSTEM ONLINE (OSRM + NOMINATIM)</span>
         </div>
     </header>
 
-
     <main>
-
         <section class="hero">
-
             <div class="planner">
-
-                <div class="section-label">
-                    ROUTE PLANNER
-                </div>
-
-                <h2>
-                    Find the most cost-efficient
-                    fuel stops.
-                </h2>
-
+                <div class="section-label">TRIP PLANNER</div>
+                <h2>Plan fuel stops and stay ahead of hazards.</h2>
                 <p class="description">
-                    Plan a route using your vehicle's
-                    500-mile maximum range and current
-                    fuel prices.
+                    Calculates optimal fuel stops within 500-mile vehicle range and monitors real-time road closures,
+                    disruptions, and weather hazards along your highway corridor.
                 </p>
 
                 <form id="route-form">
-
                     <label>
                         START LOCATION
-                        <input
-                            id="start"
-                            type="text"
-                            placeholder="New York, NY"
-                            required
-                        >
+                        <input id="start" type="text" placeholder="e.g. Chicago, IL" value="Chicago, IL" required>
                     </label>
 
                     <label>
                         DESTINATION
-                        <input
-                            id="finish"
-                            type="text"
-                            placeholder="Chicago, IL"
-                            required
-                        >
+                        <input id="finish" type="text" placeholder="e.g. Little Rock, AR" value="Little Rock, AR" required>
                     </label>
 
                     <button type="submit">
-                        CALCULATE ROUTE
+                        CALCULATE ROUTE & HAZARDS
                         <span>→</span>
                     </button>
-
                 </form>
 
-                <div id="error" class="error hidden"></div>
-
-            </div>
-
-
-            <div class="map-wrapper">
-
-                <div id="map"></div>
-
-                <div id="loading" class="map-loading hidden">
-                    CALCULATING ROUTE...
+                <div class="quick-routes">
+                    <span class="quick-label">VERIFIED ROUTES:</span>
+                    <button type="button" class="btn-chip" onclick="setRoute('Chicago, IL', 'Little Rock, AR')">Chicago → Little Rock</button>
+                    <button type="button" class="btn-chip" onclick="setRoute('St. Louis, MO', 'Houston, TX')">St. Louis → Houston</button>
+                    <button type="button" class="btn-chip" onclick="setRoute('Dallas, TX', 'Houston, TX')">Dallas → Houston (Direct)</button>
                 </div>
 
+                <div id="error" class="error hidden"></div>
             </div>
 
+            <div class="map-wrapper">
+                <div id="map"></div>
+                <div id="loading" class="map-loading hidden">
+                    CALCULATING OPTIMAL ROUTE & SCANNING HAZARDS...
+                </div>
+            </div>
         </section>
 
-
         <section id="results" class="results hidden">
-
+            <!-- Metrics Row -->
             <div class="metrics">
-
                 <div class="metric">
                     <span>DISTANCE</span>
                     <strong id="distance">—</strong>
@@ -129,33 +94,108 @@
                     <strong id="fuel-cost">—</strong>
                 </div>
 
+                <div class="metric alert-metric" id="hazard-metric-card">
+                    <span>ROUTE ALERTS</span>
+                    <strong id="alert-summary">0 ACTIVE</strong>
+                </div>
             </div>
 
+            <!-- Two-Column Grid: Left = Travel Awareness & Voice Co-Pilot, Right = Fuel Stops -->
+            <div class="results-grid">
+                
+                <!-- Travel Awareness & Voice Interaction Column -->
+                <div class="copilot-column">
+                    <!-- Heads-up Alerts Section -->
+                    <div class="panel-card alerts-panel">
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">HEADS-UP TRAVEL AWARENESS</span>
+                                <h3>Road Ahead & Weather Hazards</h3>
+                            </div>
+                            <div id="alert-badge" class="badge-pill">NO ALERTS</div>
+                        </div>
 
-            <div class="stops-section">
+                        <!-- Co-Pilot Travel Advisory Banner -->
+                        <div id="copilot-briefing" class="briefing-box">
+                            <div class="briefing-header">
+                                <span class="briefing-tag">CO-PILOT ADVISORY</span>
+                                <span id="ai-model-tag" class="model-tag">DETERMINISTIC RULES</span>
+                            </div>
+                            <p id="briefing-text">Calculating route conditions...</p>
+                        </div>
 
-                <div class="section-heading">
-                    <div>
-                        <span class="section-label">
-                            OPTIMIZED PLAN
-                        </span>
-
-                        <h3>Fuel Stops</h3>
+                        <div id="events-list" class="events-list"></div>
                     </div>
 
-                    <div id="stop-count"></div>
+                    <!-- Bolna Voice Agent Interaction Box -->
+                    <div class="panel-card voice-panel">
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">VOICE INTERACTION</span>
+                                <h3>Bolna Voice Co-Pilot</h3>
+                            </div>
+                            <div class="voice-indicator">
+                                <span class="pulse-ring"></span>
+                                <span>VOICE READY</span>
+                            </div>
+                        </div>
+
+                        <p class="voice-hint">
+                            Ask a conversational question about road events or fuel stops along your route.
+                        </p>
+
+                        <div class="preset-queries">
+                            <button type="button" class="btn-query" onclick="askPresetQuery('What does this event mean for my route?')">
+                                "What does this event mean for my route?"
+                            </button>
+                            <button type="button" class="btn-query" onclick="askPresetQuery('Will the road closure affect my scheduled fuel stop?')">
+                                "Will the closure affect my fuel stop?"
+                            </button>
+                            <button type="button" class="btn-query" onclick="askPresetQuery('What are the weather conditions ahead?')">
+                                "What are the weather conditions ahead?"
+                            </button>
+                        </div>
+
+                        <form id="voice-query-form" class="voice-form">
+                            <div class="input-with-button">
+                                <input id="voice-input" type="text" placeholder="Ask Bolna about conditions on the road ahead...">
+                                <button type="submit" id="voice-submit-btn">ASK</button>
+                                <button type="button" id="speak-answer-btn" class="speak-btn" title="Read Answer Aloud">🔊</button>
+                            </div>
+                        </form>
+
+                        <div id="voice-response" class="voice-response hidden">
+                            <div class="voice-balloon">
+                                <div class="balloon-header">
+                                    <strong>BOLNA CO-PILOT:</strong>
+                                    <span id="voice-ai-badge" class="badge-mini">AI GROUNDED</span>
+                                </div>
+                                <p id="voice-answer-text"></p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div id="stops-list"></div>
+                <!-- Fuel Stops Column -->
+                <div class="stops-column">
+                    <div class="panel-card stops-panel">
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">OPTIMIZED REFUELLING PLAN</span>
+                                <h3>Fuel Stops</h3>
+                            </div>
+                            <div id="stop-count" class="badge-pill">0 STOPS</div>
+                        </div>
+
+                        <div id="stops-list" class="stops-list"></div>
+                    </div>
+                </div>
 
             </div>
-
         </section>
-
     </main>
 
 </div>
-
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./app.js"></script>

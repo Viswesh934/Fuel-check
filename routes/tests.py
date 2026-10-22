@@ -405,3 +405,142 @@ class OptimizeRouteAPITests(TestCase):
         self.assertEqual(res1.data, res2.data)
 
 
+class NewServicesAndTravelCopilotTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+
+    def test_geocoding_service_built_in_resolution(self):
+        from routes.services.geocoding import GeocodingService
+        geocoder = GeocodingService()
+        result = geocoder.geocode("Chicago, IL")
+        self.assertIn("longitude", result)
+        self.assertIn("latitude", result)
+        self.assertAlmostEqual(result["latitude"], 41.8781, delta=0.5)
+
+    def test_routing_service_fallback(self):
+        from routes.services.routing import RoutingService
+        router = RoutingService()
+        # Test fallback generator logic directly
+        route = router._get_fallback_route(-87.62, 41.88, -92.28, 34.74)
+        self.assertGreater(route["distance_meters"], 400000)
+        self.assertEqual(route["geometry"]["type"], "LineString")
+        self.assertGreater(len(route["geometry"]["coordinates"]), 10)
+
+    def test_fuel_station_service_corridor_generation(self):
+        """
+        Verifies that FuelStationService generates realistic truck stops along route
+        without needing any SQL database import.
+        """
+        from routes.services.station_service import FuelStationService
+        service = FuelStationService()
+        route_points = [
+            {"longitude": -87.66, "latitude": 41.88, "mile": 0.0},
+            {"longitude": -89.00, "latitude": 39.50, "mile": 200.0},
+            {"longitude": -90.20, "latitude": 38.62, "mile": 350.0},
+            {"longitude": -92.35, "latitude": 34.71, "mile": 650.0},
+        ]
+        candidates = service.get_candidate_stations_for_route(route_points, 650.0)
+        self.assertGreater(len(candidates), 3)
+        for cand in candidates:
+            st = cand["station"]
+            self.assertTrue(hasattr(st, "name"))
+            self.assertTrue(hasattr(st, "retail_price"))
+            self.assertTrue(2.50 <= float(st.retail_price) <= 4.50)
+            self.assertGreaterEqual(cand["route_mile"], 0.0)
+            self.assertLessEqual(cand["route_mile"], 650.0)
+
+    def test_deterministic_travel_event_matching(self):
+        """
+        Validates deterministic route-aware matching:
+        - Event near route is matched (affects_route = True)
+        - Event far from route (e.g. Snoqualmie Pass, WA) is NOT matched (affects_route = False)
+        - Performed without any LLM invocation
+        """
+        from routes.services.travel_events import TravelEventService
+        service = TravelEventService()
+        # Route passing through St. Louis (-90.199, 38.627) to Little Rock (-92.28, 34.74)
+        route_points = [
+            {"longitude": -87.66, "latitude": 41.88, "mile": 0.0},
+            {"longitude": -89.50, "latitude": 40.00, "mile": 150.0},
+            {"longitude": -90.20, "latitude": 38.63, "mile": 300.0},  # Intersects I-55 St. Louis event
+            {"longitude": -92.28, "latitude": 34.74, "mile": 650.0},
+        ]
+        result = service.match_events_to_route(route_points, 650.0, default_tolerance_miles=15.0)
+        self.assertTrue(result["has_matching_events"])
+        matched_ids = [e["id"] for e in result["matched_events"]]
+        self.assertIn("SIM-CLOSURE-5501", matched_ids)
+        # Snoqualmie pass (Montana/Washington) must NOT be matched
+        self.assertNotIn("SIM-OFFROUTE-9005", matched_ids)
+
+        # Check Snoqualmie in all_events has affects_route = False
+        off_route_event = next(e for e in result["all_events"] if e["id"] == "SIM-OFFROUTE-9005")
+        self.assertFalse(off_route_event["affects_route"])
+
+    def test_conditional_ai_zero_llm_calls_when_no_matching_event(self):
+        """
+        Crucial cost-conscious rule:
+        No matching events and no explicit query = ZERO LLM calls!
+        """
+        from routes.services.bedrock_service import BedrockAdvisorService
+        advisor = BedrockAdvisorService()
+        res = advisor.generate_advisory(
+            route_summary={"distance_miles": 100},
+            matched_events=[],
+            fuel_stops=[],
+            user_query=None,
+        )
+        self.assertFalse(res["llm_used"])
+        self.assertEqual(res["model"], "deterministic-rules")
+
+    def test_voice_query_api_grounded_response(self):
+        """
+        Tests /api/v1/voice/query/ endpoint handles traveler questions
+        grounded in backend data.
+        """
+        with patch("routes.services.bolna_service.GeocodingService") as mock_geo_cls, \
+             patch("routes.services.bolna_service.RoutingService") as mock_route_cls:
+            mock_geo = mock_geo_cls.return_value
+            mock_geo.geocode.side_effect = [
+                {"longitude": -87.66, "latitude": 41.88, "label": "Chicago, IL"},
+                {"longitude": -92.28, "latitude": 34.74, "label": "Little Rock, AR"},
+            ]
+            mock_route = mock_route_cls.return_value
+            mock_route.get_route.return_value = {
+                "distance_meters": 650 * 1609.344,
+                "duration_seconds": 36000,
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-87.66, 41.88], [-90.20, 38.63], [-92.28, 34.74]],
+                },
+            }
+
+            res = self.client.post(
+                "/api/v1/voice/query/",
+                {
+                    "query": "What does this event mean for my route?",
+                    "start": "Chicago, IL",
+                    "finish": "Little Rock, AR",
+                },
+                format="json",
+            )
+            self.assertEqual(res.status_code, status.HTTP_200_OK)
+            self.assertIn("spoken_answer", res.data)
+            self.assertIn("affects_route", res.data)
+            self.assertIn("route_summary", res.data)
+
+    def test_travel_events_list_api(self):
+        """
+        Tests GET /api/v1/events/ returns registered events with explicit simulated labels.
+        """
+        res = self.client.get("/api/v1/events/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertGreater(res.data["count"], 0)
+        events = res.data["events"]
+        # Ensure simulated events are clearly flagged
+        for evt in events:
+            if evt["is_simulated"]:
+                self.assertEqual(evt["source"], "SIMULATED")
+
+
+
