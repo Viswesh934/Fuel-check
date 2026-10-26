@@ -12,6 +12,11 @@ class OptimizeRouteSerializer(serializers.Serializer):
         allow_blank=False,
     )
 
+    language = serializers.CharField(
+        required=False,
+        default="en",
+    )
+
 
 class VoiceQuerySerializer(serializers.Serializer):
     query = serializers.CharField(
@@ -20,9 +25,24 @@ class VoiceQuerySerializer(serializers.Serializer):
     )
     start = serializers.CharField(
         required=False,
-        default="Chicago, IL",
+        default="Delhi",
     )
     finish = serializers.CharField(
         required=False,
-        default="Little Rock, AR",
+        default="Mumbai",
+    )
+    language = serializers.CharField(
+        required=False,
+        default="en",
+    )
+
+
+class VoiceTTSSerializer(serializers.Serializer):
+    text = serializers.CharField(
+        required=True,
+        allow_blank=False,
+    )
+    language = serializers.CharField(
+        required=False,
+        default="en",
     )

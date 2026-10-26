@@ -5,7 +5,13 @@ from .views import (
     OptimizeRouteView,
     TravelEventsListView,
     VoiceQueryView,
+    VoiceTTSView,
     BolnaWebhookView,
+    CopilotHotelBookView,
+    CopilotHospitalAlertView,
+    CopilotMechanicRequestView,
+    CopilotParcelDropView,
+    CopilotSOSView,
 )
 
 urlpatterns = [
@@ -30,8 +36,39 @@ urlpatterns = [
         name="voice-query",
     ),
     path(
+        "v1/voice/tts/",
+        VoiceTTSView.as_view(),
+        name="voice-tts",
+    ),
+    path(
         "v1/bolna/webhook/",
         BolnaWebhookView.as_view(),
         name="bolna-webhook",
+    ),
+    # Co-Pilot Dedicated Action Endpoints
+    path(
+        "v1/copilot/hotels/book/",
+        CopilotHotelBookView.as_view(),
+        name="copilot-hotel-book",
+    ),
+    path(
+        "v1/copilot/hospitals/alert/",
+        CopilotHospitalAlertView.as_view(),
+        name="copilot-hospital-alert",
+    ),
+    path(
+        "v1/copilot/mechanics/request/",
+        CopilotMechanicRequestView.as_view(),
+        name="copilot-mechanic-request",
+    ),
+    path(
+        "v1/copilot/parcels/drop/",
+        CopilotParcelDropView.as_view(),
+        name="copilot-parcel-drop",
+    ),
+    path(
+        "v1/copilot/sos/",
+        CopilotSOSView.as_view(),
+        name="copilot-sos",
     ),
 ]

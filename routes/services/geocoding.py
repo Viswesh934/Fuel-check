@@ -42,6 +42,19 @@ class GeocodingService:
         if normalized_query in FALLBACK_LOCATIONS:
             return dict(FALLBACK_LOCATIONS[normalized_query])
 
+        # 0. AWS Places V2 Geocoding (if AWS_LOCATION_API_KEY is configured)
+        import os
+        aws_key = getattr(settings, "AWS_LOCATION_API_KEY", os.getenv("AWS_LOCATION_API_KEY", "")).strip()
+        if aws_key:
+            try:
+                from .aws_location_service import geocode_place
+                lon, lat = geocode_place(query)
+                is_india = (68.0 <= lon <= 97.0 and 8.0 <= lat <= 37.0)
+                label = f"{query}, India" if is_india else f"{query}"
+                return {"longitude": lon, "latitude": lat, "label": label}
+            except Exception as e:
+                logger.warning(f"AWS Places V2 geocoding failed: {e}. Falling back.")
+
         # 1. Mapbox Geocoding (if token is provided)
         if self.provider == "mapbox" and self.mapbox_token:
             try:

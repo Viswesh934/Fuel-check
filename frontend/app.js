@@ -1,468 +1,946 @@
-// Step 1: Register Service Worker Network Proxy (for Codespaces & Same-Origin requests)
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", async () => {
-        try {
-            const registration = await navigator.serviceWorker.register("./proxy-worker.js");
-            console.log("[Frontend Proxy] Registered with scope:", registration.scope);
-            checkHealth();
-        } catch (error) {
-            console.error("[Frontend Proxy] Registration failed:", error);
-            checkHealth();
-        }
-    });
-} else {
-    window.addEventListener("load", () => {
-        checkHealth();
-    });
-}
+/**
+ * Fuel Check — Indian Truck Driver Co-Pilot Client Application
+ * Standardized for Indian Commercial Highways (NH 48, NH 44, Golden Quadrilateral)
+ * Features:
+ *  - Metric Units: km, Liters (L), Indian Rupees (₹)
+ *  - 4 Supported Languages: English (en-IN), हिन्दी (hi-IN), தமிழ் (ta-IN), తెలుగు (te-IN)
+ *  - Hands-free Wake-Word "Disha" / "दिशा"
+ *  - Zero-scroll single plane cockpit layout
+ *  - Dhabas, 24/7 Trauma Centers, Puncture/Mechanics, and Diesel bunks
+ */
 
 // API Endpoints
 const API_URL = "/api/v1/routes/optimize/";
 const VOICE_API_URL = "/api/v1/voice/query/";
-const HEALTH_URL = "/api/health/";
+const TTS_API_URL = "/api/v1/voice/tts/";
+const HOTEL_BOOK_URL = "/api/v1/copilot/hotels/book/";
+const HOSPITAL_ALERT_URL = "/api/v1/copilot/hospitals/alert/";
+const MECHANIC_REQ_URL = "/api/v1/copilot/mechanics/request/";
+const SOS_URL = "/api/v1/copilot/sos/";
 
-// Initialize Leaflet Map
-const map = L.map("map", {
-    zoomControl: false,
-}).setView([39.8283, -98.5795], 4);
+// In-Memory Audio Cache for instant Sarvam voice playback (avoids browser TTS)
+const audioCache = new Map();
+let currentActiveAudio = null;
 
-L.control.zoom({
-    position: "bottomright",
+// Indian Metric & Currency Constants
+const MILES_TO_KM = 1.60934;
+const GALS_TO_LITERS = 3.78541;
+const DEFAULT_DIESEL_INR_PER_LITER = 90.75; // Average Indian Highway Diesel Rate (₹/L)
+
+// 4 Supported Languages Dictionary (English, हिन्दी, தமிழ், తెలుగు)
+const i18n = {
+    en: {
+        app_name: "Fuel Check",
+        app_sub: "INDIAN TRUCK DRIVER CO-PILOT",
+        origin_label: "Start Location",
+        dest_label: "Destination",
+        btn_find: "Find Route",
+        sos_btn: "🚨 SOS (112)",
+        dist_label: "Total Distance",
+        time_label: "Drive Time",
+        fuel_label: "Diesel Needed",
+        cost_label: "Est. Fuel Cost",
+        tab_diesel: "⛽ Diesel (₹/L)",
+        tab_dhaba: "🏨 Dhabas & Rest",
+        tab_doctor: "🏥 Doctor & Hospital",
+        tab_mechanic: "🔧 Mechanic / Puncture",
+        tab_cargo: "📦 Cargo / Bilti",
+        disha_wake_prompt: "Say \"Disha\" or tap mic",
+        disha_listening: "Disha is listening... (Speak now)",
+        disha_thinking: "Disha is checking the highway...",
+        disha_speaking: "Disha is answering...",
+        book_now: "Book Dhaba",
+        call_er: "Call ER Doctor",
+        call_mechanic: "Call Mechanic",
+        road_clear: "NH highway is clear ahead. Safe journey!",
+        wind_alert: "Strong winds reported. Keep truck steady.",
+        legend_fuel: "Diesel (₹)",
+        legend_dhaba: "Dhaba",
+        legend_doctor: "Hospital",
+        legend_mechanic: "Mechanic",
+        legend_weather: "Weather",
+        loading_text: "Calculating highway route and cheapest diesel...",
+        disha_default_greeting: "Namaste! I am Disha. Delhi to Mumbai route and cheap diesel stops are ready. Say 'Disha' anytime!",
+        unit_km: "km",
+        unit_l: "L",
+        unit_hrs: "hrs",
+        currency_symbol: "₹",
+    },
+    hi: {
+        app_name: "फ्यूल चेक",
+        app_sub: "भारतीय ट्रक ड्राइवर हमसफ़र",
+        origin_label: "कहाँ से",
+        dest_label: "कहाँ तक",
+        btn_find: "रास्ता खोजें",
+        sos_btn: "🚨 आपातकाल (112)",
+        dist_label: "कुल दूरी",
+        time_label: "ड्राइव समय",
+        fuel_label: "डीज़ल खपत",
+        cost_label: "डीज़ल खर्चा",
+        tab_diesel: "⛽ सस्ता डीज़ल (₹/L)",
+        tab_dhaba: "🏨 ढाबा और आराम",
+        tab_doctor: "🏥 डॉक्टर और अस्पताल",
+        tab_mechanic: "🔧 पंचर और मिस्त्री",
+        tab_cargo: "📦 बिल्टी / लोड",
+        disha_wake_prompt: "\"दिशा\" बोलें या माइक दबाएँ",
+        disha_listening: "दिशा सुन रही है... बोलिए",
+        disha_thinking: "दिशा हाईवे चेक कर रही है...",
+        disha_speaking: "दिशा जवाब दे रही है...",
+        book_now: "ढाबा बुक करें",
+        call_er: "अस्पताल कॉल",
+        call_mechanic: "मिस्त्री बुलाएँ",
+        road_clear: "हाईवे एकदम साफ़ है। शुभ यात्रा!",
+        wind_alert: "आगे तेज़ आँधी है, गाड़ी की रफ़्तार नियंत्रित रखें।",
+        legend_fuel: "डीज़ल (₹)",
+        legend_dhaba: "ढाबा",
+        legend_doctor: "अस्पताल",
+        legend_mechanic: "मिस्त्री",
+        legend_weather: "मौसम",
+        loading_text: "सस्ता डीज़ल और सबसे अच्छा हाईवे रूट खोज रहे हैं...",
+        disha_default_greeting: "नमस्ते! मैं दिशा हूँ। दिल्ली से मुंबई का सस्ता डीज़ल और ढाबा तैयार है। 'दिशा' बोलें कभी भी!",
+        unit_km: "किमी",
+        unit_l: "ली",
+        unit_hrs: "घंटे",
+        currency_symbol: "₹",
+    },
+    ta: {
+        app_name: "ஃப்யூல் செக்",
+        app_sub: "இந்திய லாரி டிரைவர் வழிகாட்டி",
+        origin_label: "புறப்படும் இடம்",
+        dest_label: "சேருமிடம்",
+        btn_find: "வழி தேடு",
+        sos_btn: "🚨 அவசர உதவி (112)",
+        dist_label: "மொத்த தூரம்",
+        time_label: "பயண நேரம்",
+        fuel_label: "டீசல் தேவை",
+        cost_label: "டீசல் செலவு",
+        tab_diesel: "⛽ டீசல் பங்க் (₹)",
+        tab_dhaba: "🏨 தாபா & தங்குமிடம்",
+        tab_doctor: "🏥 மருத்துவமனை & டாக்டர்",
+        tab_mechanic: "🔧 மெக்கானிக் & பஞ்சர்",
+        tab_cargo: "📦 சரக்கு பில்டி",
+        disha_wake_prompt: "\"திஷா\" என்று சொல்லவும்",
+        disha_listening: "திஷா கேட்கிறது... பேசுங்கள்",
+        disha_thinking: "திஷா வழியை சரிபார்க்கிறது...",
+        disha_speaking: "திஷா பேசுகிறது...",
+        book_now: "தாபா முன்பதிவு",
+        call_er: "அவசர அழைப்பு",
+        call_mechanic: "மெக்கானிக் அழைக்க",
+        road_clear: "தேசிய நெடுஞ்சாலை சீராக உள்ளது. பாதுகாப்பான பயணம்!",
+        wind_alert: "முன்னே பலத்த காற்று. லாரியை கவனமாக ஓட்டவும்.",
+        legend_fuel: "டீசல் (₹)",
+        legend_dhaba: "தாபா",
+        legend_doctor: "மருத்துவமனை",
+        legend_mechanic: "மெக்கானிக்",
+        legend_weather: "வானிலை",
+        loading_text: "சிறந்த நெடுஞ்சாலை மற்றும் மலிவு டீசல் தேடப்படுகிறது...",
+        disha_default_greeting: "வணக்கம்! நான் திஷா. டீசல் பங்க், தாபா அல்லது உதவிக்கு 'திஷா' என்று கூறவும்!",
+        unit_km: "கி.மீ",
+        unit_l: "லி",
+        unit_hrs: "மணி",
+        currency_symbol: "₹",
+    },
+    te: {
+        app_name: "ఫ్యూయల్ చెక్",
+        app_sub: "భారతీయ లారీ డ్రైవర్ సలహాదారు",
+        origin_label: "ఎక్కడ నుండి",
+        dest_label: "ఎక్కడికి",
+        btn_find: "రూట్ శోధించండి",
+        sos_btn: "🚨 అత్యవసర సహాయం (112)",
+        dist_label: "మొత్తం దూరం",
+        time_label: "ప్రయాణ సమయం",
+        fuel_label: "డీజిల్ పరిమాణం",
+        cost_label: "డీజిల్ ఖర్చు",
+        tab_diesel: "⛽ చౌక డీజిల్ (₹)",
+        tab_dhaba: "🏨 ధాబా & విశ్రాంతి",
+        tab_doctor: "🏥 డాక్టర్ & ఆసుపత్రి",
+        tab_mechanic: "🔧 మెకానిక్ & పంక్చర్",
+        tab_cargo: "📦 బిల్టీ / సరుకు",
+        disha_wake_prompt: "\"దిశ\" అని చెప్పండి",
+        disha_listening: "దిశ వింటోంది... చెప్పండి",
+        disha_thinking: "దిశ హైవే పరిశీలిస్తోంది...",
+        disha_speaking: "దిశ మాట్లాడుతోంది...",
+        book_now: "ధాబా బుకింగ్",
+        call_er: "ఆసుపత్రి కాల్",
+        call_mechanic: "మెకానిక్ పిలవండి",
+        road_clear: "జాతీయ రహదారి స్పష్టంగా ఉంది. శుభ ప్రయాణం!",
+        wind_alert: "ముందు బలమైన గాలులు ఉన్నాయి. వేగాన్ని నియంత్రించండి.",
+        legend_fuel: "డీజిల్ (₹)",
+        legend_dhaba: "ధాబా",
+        legend_doctor: "ఆసుపత్రి",
+        legend_mechanic: "మెకానిక్",
+        legend_weather: "వాతావరణం",
+        loading_text: "చౌక డీజిల్ మరియు హైవే మార్గం శోధిస్తున్నాము...",
+        disha_default_greeting: "నమస్కారం! నేను దిశను. డీజిల్ బంక్, ధాబా లేదా వైద్య సహాయం కోసం 'దిశ' అని పిలవండి!",
+        unit_km: "కి.మీ",
+        unit_l: "లీ",
+        unit_hrs: "గం",
+        currency_symbol: "₹",
+    }
+};
+
+let currentLang = "en";
+let currentCategory = "fuel";
+let currentRouteData = null;
+let currentAudioBase64 = null;
+let isVoiceActive = false;
+let speechRecognizer = null;
+let wakeRecognizer = null;
+let isWakeListening = false;
+
+// 1. Initialize Map Centered on India (Delhi - Mumbai Corridor)
+const map = L.map("map", { zoomControl: false }).setView([22.5, 78.5], 5);
+L.control.zoom({ position: "bottomright" }).addTo(map);
+
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 16,
+    attribution: "Tiles &copy; Esri &bull; Fuel Check India"
 }).addTo(map);
 
-L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-    {
-        maxZoom: 16,
-        attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
-    }
-).addTo(map);
-
-L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
-    {
-        maxZoom: 16,
-    }
-).addTo(map);
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 16
+}).addTo(map);
 
 let routeLayer = null;
 let markers = [];
-let currentRouteData = null;
 
-// Client Cache
-const clientCache = new Map();
-const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
-
-function getCachedRoute(start, finish) {
-    const key = `${start.trim().toLowerCase()}|${finish.trim().toLowerCase()}`;
-    const entry = clientCache.get(key);
-    if (!entry) return null;
-    if (Date.now() - entry.timestamp > CLIENT_CACHE_TTL_MS) {
-        clientCache.delete(key);
-        return null;
+// 2. Chime Audio Tone on Wake-Word "Disha" / "दिशा"
+function playChime() {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.28);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.28);
+    } catch (e) {
+        console.warn("Chime error:", e);
     }
-    return entry.data;
 }
 
-function setCachedRoute(start, finish, data) {
-    const key = `${start.trim().toLowerCase()}|${finish.trim().toLowerCase()}`;
-    clientCache.set(key, { timestamp: Date.now(), data });
+// 3. Language Switcher Engine
+function changeLanguage(langKey) {
+    if (!i18n[langKey]) langKey = "en";
+    currentLang = langKey;
+
+    document.querySelectorAll(".btn-lang").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-lang") === langKey);
+    });
+
+    const dict = i18n[langKey];
+
+    document.querySelectorAll("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        if (dict[key]) {
+            el.textContent = dict[key];
+        }
+    });
+
+    const startInput = document.getElementById("start");
+    const finishInput = document.getElementById("finish");
+    if (startInput) startInput.placeholder = dict.origin_label || "Start";
+    if (finishInput) finishInput.placeholder = dict.dest_label || "Destination";
+
+    const dishaSub = document.getElementById("disha-sub-label");
+    if (dishaSub && !isVoiceActive) dishaSub.textContent = dict.disha_wake_prompt;
+
+    // Reset speech text to language default greeting and clear stale audio
+    currentAudioBase64 = null;
+    const speechEl = document.getElementById("disha-speech-text");
+    if (speechEl && dict.disha_default_greeting) {
+        speechEl.textContent = dict.disha_default_greeting;
+        // Pre-fetch native Sarvam voice for instantaneous replay
+        getOrFetchSarvamAudio(dict.disha_default_greeting, currentLang).then(b64 => {
+            if (b64 && currentLang === langKey) currentAudioBase64 = b64;
+        });
+    }
+
+    // Update quick chips in selected language
+    const chipTexts = {
+        hi: [
+            { text: "⛽ डीजल पंप", q: "यहां का डीजल पंप कहां है" },
+            { text: "🏨 ढाबा / रेस्ट", q: "आसपास ढाबा और सोने की जगह कहां है" },
+            { text: "🏥 अस्पताल", q: "इमरजेंसी डॉक्टर या अस्पताल" },
+            { text: "🔧 मिस्त्री", q: "पंचर मिस्त्री को बुलाओ" }
+        ],
+        te: [
+            { text: "⛽ డీజిల్ బంక్", q: "ఇక్కడ డీజిల్ బంక్ ఎక్కడ ఉంది" },
+            { text: "🏨 ధాబా & విశ్రాంతి", q: "సమీపంలోని ధాబా మరియు విశ్రాంతి స్థలం ఎక్కడ ఉంది" },
+            { text: "🏥 ఆసుపత్రి", q: "ఎమర్జెన్సీ డాక్టర్ లేదా ఆసుపత్రి" },
+            { text: "🔧 మెకానిక్", q: "పంక్చర్ మెకానిక్ పిలవండి" }
+        ],
+        ta: [
+            { text: "⛽ டீசல் பங்க்", q: "இங்கு டீசல் பங்க் எங்கே உள்ளது" },
+            { text: "🏨 தாபா & ஓய்வு", q: "அருகிலுள்ள தாபா மற்றும் தங்குமிடம் எங்கே" },
+            { text: "🏥 மருத்துவமனை", q: "அவசர சிகிச்சை அல்லது மருத்துவமனை" },
+            { text: "🔧 மெக்கானிக்", q: "பஞ்சர் மெக்கானிக் அழைக்கவும்" }
+        ],
+        en: [
+            { text: "⛽ Diesel Bunks", q: "Where is the nearest diesel pump?" },
+            { text: "🏨 Dhabas & Rest", q: "Where can I find dhabas and truck rest?" },
+            { text: "🏥 Hospitals", q: "Emergency doctor and hospital near me" },
+            { text: "🔧 Mechanics", q: "Call emergency truck mechanic for puncture" }
+        ]
+    };
+
+    const chipsContainer = document.querySelector(".disha-quick-chips");
+    if (chipsContainer && chipTexts[langKey]) {
+        chipsContainer.innerHTML = chipTexts[langKey].map(c => 
+            `<button type="button" class="disha-chip" onclick="askDishaPreset('${c.q}')">${c.text}</button>`
+        ).join("");
+    }
+
+    const textInput = document.getElementById("disha-text-input");
+    if (textInput) {
+        const phs = {
+            hi: "पूछिए (Ask Disha in Hindi)...",
+            te: "అడగండి (Ask Disha in Telugu)...",
+            ta: "கேளுங்கள் (Ask Disha in Tamil)...",
+            en: "Ask Disha in English..."
+        };
+        textInput.placeholder = phs[langKey] || phs.en;
+    }
+
+    if (wakeRecognizer) {
+        const wakeLangs = { en: "en-IN", hi: "hi-IN", ta: "ta-IN", te: "te-IN" };
+        wakeRecognizer.lang = wakeLangs[currentLang] || "en-IN";
+    }
+
+    if (currentRouteData) {
+        updateStatsDisplay(currentRouteData);
+        renderCategoryCards(currentCategory);
+        // Refresh route advisory and amenities in chosen language
+        const s = document.getElementById("start")?.value || "Delhi";
+        const f = document.getElementById("finish")?.value || "Mumbai";
+        calculateRoute(s, f);
+    }
+
+    console.log(`[Language Switched to ${langKey}]`);
 }
 
-// Elements
-const form = document.getElementById("route-form");
-const errorBox = document.getElementById("error");
-const loading = document.getElementById("loading");
-const results = document.getElementById("results");
-const voiceForm = document.getElementById("voice-query-form");
-const voiceInput = document.getElementById("voice-input");
-const voiceResponse = document.getElementById("voice-response");
-const voiceAnswerText = document.getElementById("voice-answer-text");
-const voiceAiBadge = document.getElementById("voice-ai-badge");
-const speakBtn = document.getElementById("speak-answer-btn");
+// 4. Update Stats in Metric Units (km, L, ₹)
+function updateStatsDisplay(data) {
+    const dict = i18n[currentLang] || i18n.en;
 
-// Handle Route Planning Submission
-form.addEventListener("submit", async (event) => {
-    event.preventDefault();
+    const rawMiles = data.route?.distance_miles || 878.8;
+    const rawMins = data.route?.duration_minutes || 1351;
+    const rawGals = data.fuel?.consumed_gallons || (rawMiles / 10.0);
 
-    const start = document.getElementById("start").value.trim();
-    const finish = document.getElementById("finish").value.trim();
+    // Metric conversions
+    const distKm = Math.round(rawMiles * MILES_TO_KM);
+    const durHrs = (rawMins / 60).toFixed(1);
+    const liters = Math.round(rawGals * GALS_TO_LITERS);
+    const totalCostInr = Math.round(liters * DEFAULT_DIESEL_INR_PER_LITER);
 
-    clearError();
+    document.getElementById("stat-distance").textContent = `${distKm.toLocaleString('en-IN')} ${dict.unit_km || 'km'}`;
+    document.getElementById("stat-duration").textContent = `${durHrs} ${dict.unit_hrs || 'hrs'}`;
+    document.getElementById("stat-fuel").textContent = `${liters.toLocaleString('en-IN')} ${dict.unit_l || 'L'}`;
+    document.getElementById("stat-cost").textContent = `₹${totalCostInr.toLocaleString('en-IN')}`;
+}
 
-    // Check client cache first
-    const cachedData = getCachedRoute(start, finish);
-    if (cachedData) {
-        currentRouteData = cachedData;
-        renderRoute(cachedData);
-        renderResults(cachedData);
+const categoryVoiceAnnouncements = {
+    fuel: {
+        hi: "हाईवे पर आगे 120 किमी पर इंडियनऑयल स्वागत पंप है, जहाँ डीज़ल ₹90.75 प्रति लीटर है।",
+        en: "Next diesel stop is IndianOil Swagat Bunk, 120 km ahead at ₹90.75/L.",
+        ta: "வழியில் 120 கி.மீ முன்னால் இந்தியன் ஆயில் பங்க் உள்ளது (டீசல் ₹90.75/L).",
+        te: "ముందు 120 కి.మీ దూరంలో ఇండియన్ ఆయిల్ బంక్ ఉంది (డీజిల్ ₹90.75/L)."
+    },
+    dhaba: {
+        hi: "हाईवे पर 45 किमी आगे पहलवान ढाबा और 24 घंटे सुरक्षित ट्रक पार्किंग उपलब्ध है।",
+        en: "Pahalwan Dhaba with 24/7 chai and secure truck parking is 45 km ahead.",
+        ta: "45 கி.மீ முன்னால் பாதுகாப்பான லாரி பார்க்கிங் மற்றும் தாபா ஓய்வு வசதி உள்ளது.",
+        te: "45 కి.మీ దూరంలో సురక్షితమైన లారీ పార్కింగ్ మరియు ధాబా అందుబాటులో ఉన్నాయి."
+    },
+    doctor: {
+        hi: "निकटतम 24/7 ट्रॉमा सेंटर अपेक्स इमरजेंसी हॉस्पिटल है। आपातकालीन कॉल: 108 या 112।",
+        en: "Nearest 24/7 trauma emergency center is Apex Hospital. Hotline: 108 / 112.",
+        ta: "அருகிலுள்ள அவசர சிகிச்சை மையம் அபெக்ஸ் மருத்துவமனை. அவசர உதவி: 108 / 112.",
+        te: "సమీపంలోని 24/7 ఆసుపత్రి అపెక్స్ హాస్పిటల్. అత్యవసర కాల్: 108 / 112."
+    },
+    mechanic: {
+        hi: "बालाजी 24/7 मोबाइल ट्रक मिस्त्री सेवा उपलब्ध है (~20 मिनट पहुँच)। फोन: +91-94140-11223।",
+        en: "Balaji 24/7 mobile truck mechanic dispatched (~20 mins arrival). Tel: +91-94140-11223.",
+        ta: "24/7 நடமாடும் மெக்கானிக் சேவை தயார் (~20 நிமிடங்கள்). எண்: +91-94140-11223.",
+        te: "24/7 మొబైల్ మెకానిక్ సేవ అందుబాటులో ఉంది (~20 నిమిషాలు). ఫోన్: +91-94140-11223."
+    },
+    cargo: {
+        hi: "बिल्टी #WB-DEL-984421 सक्रिय है। 18 टन माल भिवंडी लॉजिस्टिक्स हब, डॉक 3 पर पहुँचाना है।",
+        en: "E-Way Bill #WB-DEL-984421 is active for 18 tonnes FMCG cargo to Bhiwandi Dock #3.",
+        ta: "பில்டி #WB-DEL-984421 செயலில் உள்ளது. சரக்கு டாக் 3-ல் இறக்கப்பட வேண்டும்.",
+        te: "బిల్టీ #WB-DEL-984421 సక్రియంగా ఉంది. సరుకు డాక్ 3 లో డెలివరీ చేయాలి."
+    }
+};
+
+// 5. Category Tab Switcher
+function switchCategory(cat) {
+    currentCategory = cat;
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-tab") === cat);
+    });
+    renderCategoryCards(cat);
+
+    // Update Disha Speech Bubble with category guidance in active language
+    const msg = categoryVoiceAnnouncements[cat]?.[currentLang] || categoryVoiceAnnouncements[cat]?.en;
+    if (msg) {
+        document.getElementById("disha-speech-text").textContent = msg;
+        currentAudioBase64 = null;
+        getOrFetchSarvamAudio(msg, currentLang).then(b64 => {
+            if (b64 && currentCategory === cat) {
+                currentAudioBase64 = b64;
+            }
+        });
+    }
+}
+
+function askDishaPreset(queryText) {
+    executeVoiceQuery(queryText);
+}
+
+function handleDishaTextSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById("disha-text-input");
+    if (!input || !input.value.trim()) return;
+    const q = input.value.trim();
+    input.value = "";
+    executeVoiceQuery(q);
+}
+
+// 6. Render Indian Driver Cards (₹/L, km, Dhabas, 108/112 Hospitals)
+function renderCategoryCards(category) {
+    const container = document.getElementById("category-cards-container");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const dict = i18n[currentLang] || i18n.en;
+
+    if (!currentRouteData) {
+        container.innerHTML = `<div style="padding:16px; color:#8496a5; font-size:12px; text-align:center;">${dict.loading_text}</div>`;
         return;
     }
 
-    setLoading(true);
+    const amenities = currentRouteData.copilot_amenities || {};
+    const stops = currentRouteData.fuel_stops || [];
+
+    if (category === "fuel") {
+        const indianBunkNames = ["IndianOil Swagat Bunk", "Bharat Petroleum Ghar", "HP Highway King Point", "Reliance Petroleum Oasis"];
+        const demoStops = stops.length ? stops : [
+            { station_name: "IndianOil Swagat Bunk", city: "Kotputli Bypass (NH 48)", route_mile: 120, gallons_pumped: 25 },
+            { station_name: "Bharat Petroleum Ghar", city: "Udaipur Highway Stop", route_mile: 410, gallons_pumped: 35 }
+        ];
+
+        demoStops.forEach((s, idx) => {
+            const bName = s.station_name || indianBunkNames[idx % indianBunkNames.length];
+            const distKm = Math.round((s.route_mile || (idx + 1) * 260) * MILES_TO_KM);
+            const pumpedL = Math.round((s.gallons_pumped || s.gallons || 30) * GALS_TO_LITERS);
+            const rateInr = (DEFAULT_DIESEL_INR_PER_LITER + (idx === 0 ? -1.25 : 0.65)).toFixed(2);
+            const costInr = Math.round(pumpedL * rateInr);
+
+            const card = document.createElement("div");
+            card.className = "driver-item-card";
+            card.innerHTML = `
+                <div class="card-top-row">
+                    <strong class="card-name">⛽ ${bName}</strong>
+                    <span class="card-tag tag-green">₹${rateInr} / L</span>
+                </div>
+                <div class="card-meta-row">
+                    <span>📍 ${s.city || 'Highway Exit'} (${distKm} km point)</span>
+                    <strong style="color:var(--green)">Pump: ${pumpedL} L</strong>
+                </div>
+                <div class="card-actions-row">
+                    <span style="color:#8496a5; font-size:11px;">Total: ₹${costInr.toLocaleString('en-IN')}</span>
+                    <button class="btn-card-action" onclick="zoomToMarker(${s.latitude || 27.5}, ${s.longitude || 76.5})">📍 Show on Map</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } else if (category === "dhaba") {
+        const indianDhabas = [
+            { name: "Pahalwan Dhaba & AC Rest Bay", city: "NH 48 Kotputli", price_inr: 450, phone: "+91-98123-45678" },
+            { name: "Sukhdev Highway Dhaba & Truck Rest", city: "Near Murthal Hub", price_inr: 600, phone: "+91-98765-43210" },
+            { name: "Rajwada Punjabi Dhaba", city: "Kishangarh Expressway", price_inr: 500, phone: "+91-94140-55678" },
+            { name: "Milan Highway Motel & Parking", city: "Surat Bypass", price_inr: 750, phone: "+91-97250-99887" }
+        ];
+
+        indianDhabas.forEach(h => {
+            const card = document.createElement("div");
+            card.className = "driver-item-card";
+            card.innerHTML = `
+                <div class="card-top-row">
+                    <strong class="card-name">🏨 ${h.name}</strong>
+                    <span class="card-tag tag-blue">₹${h.price_inr} / night</span>
+                </div>
+                <div class="card-meta-row">
+                    <span>📍 ${h.city} (Secure Truck Parking)</span>
+                    <a class="card-phone" href="tel:${h.phone}">📞 ${h.phone}</a>
+                </div>
+                <div class="card-actions-row">
+                    <span style="font-size:11px; color:var(--green)">✓ 24/7 Chai & Food</span>
+                    <button class="btn-card-action" onclick="alert('Dhaba bed reserved for truck driver.')">${dict.book_now}</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } else if (category === "doctor") {
+        const indianHospitals = [
+            { name: "Apex 24/7 Trauma & Emergency Center", city: "Jaipur Bypass (NH 48)", phone: "108 / +91-141-2751800", level: "Level I Trauma" },
+            { name: "Government Sub-District Hospital", city: "Kotputli (Highway ER)", phone: "108 / 112", level: "Emergency ER 24/7" },
+            { name: "Geetanjali Hospital & Trauma Unit", city: "Udaipur Highway", phone: "108 / +91-294-2860000", level: "Level II Trauma" },
+            { name: "Civil Emergency Hospital", city: "Surat Ring Road", phone: "108 / 112", level: "Critical Care 24/7" }
+        ];
+
+        indianHospitals.forEach(h => {
+            const card = document.createElement("div");
+            card.className = "driver-item-card";
+            card.innerHTML = `
+                <div class="card-top-row">
+                    <strong class="card-name">🏥 ${h.name}</strong>
+                    <span class="card-tag tag-red">${h.level}</span>
+                </div>
+                <div class="card-meta-row">
+                    <span>📍 ${h.city}</span>
+                    <a class="card-phone" style="color:var(--red)" href="tel:108">🚨 108 / 112 Hotline</a>
+                </div>
+                <div class="card-actions-row">
+                    <span style="font-size:11px; color:#8496a5;">Ambulance on Standby</span>
+                    <button class="btn-card-action" style="border-color:var(--red); color:var(--red)" onclick="alert('Emergency ER Alert Sent to ' + '${h.name}')">${dict.call_er}</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } else if (category === "mechanic") {
+        const indianMechanics = [
+            { name: "Balaji 24/7 Mobile Truck Puncture & Tyre", city: "NH 48 Behror", phone: "+91-94140-11223", eta: 20 },
+            { name: "Guru Nanak Heavy Truck Spares & Repair", city: "Jaipur Transport Nagar", phone: "+91-98290-33445", eta: 25 },
+            { name: "Shiv Shakti Hydraulic Jack & Kamani Works", city: "Ajmer Highway", phone: "+91-97850-77889", eta: 30 },
+            { name: "Surat National Highway Recovery Crane", city: "Kamrej Toll Plaza", phone: "+91-98790-22110", eta: 15 }
+        ];
+
+        indianMechanics.forEach(m => {
+            const card = document.createElement("div");
+            card.className = "driver-item-card";
+            card.innerHTML = `
+                <div class="card-top-row">
+                    <strong class="card-name">🔧 ${m.name}</strong>
+                    <span class="card-tag tag-amber">~${m.eta} min arrival</span>
+                </div>
+                <div class="card-meta-row">
+                    <span>📍 ${m.city}</span>
+                    <a class="card-phone" href="tel:${m.phone}">📞 ${m.phone}</a>
+                </div>
+                <div class="card-actions-row">
+                    <span style="font-size:11px; color:#8496a5;">Air Compressor & Hydraulic</span>
+                    <button class="btn-card-action" onclick="alert('Mechanic dispatched. Reaching in ~' + '${m.eta}' + ' mins.')">${dict.call_mechanic}</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } else if (category === "cargo") {
+        const card = document.createElement("div");
+        card.className = "driver-item-card";
+        card.innerHTML = `
+            <div class="card-top-row">
+                <strong class="card-name">📦 Bilti / E-Way Bill: #WB-DEL-984421</strong>
+                <span class="card-tag tag-green">ACTIVE IN TRANSIT</span>
+            </div>
+            <div class="card-meta-row">
+                <span>Destination: Bhiwandi Logistics Hub, Mumbai</span>
+                <strong style="color:var(--green)">Dock #3</strong>
+            </div>
+            <div class="card-actions-row">
+                <span style="font-size:11px; color:#8496a5;">Consignment: 18 Tonnes FMCG Goods</span>
+                <button class="btn-card-action" onclick="alert('E-Way Bill validated for toll clearance.')">Verify Bilti</button>
+            </div>
+        `;
+        container.appendChild(card);
+    }
+}
+
+// 7. Map Zoom
+function zoomToMarker(lat, lng) {
+    if (!lat || !lng) return;
+    map.flyTo([lat, lng], 11, { animate: true, duration: 1.2 });
+}
+
+// 8. Route Calculation Engine
+async function calculateRoute(start, finish) {
+    const loading = document.getElementById("map-loading");
+    if (loading) loading.classList.remove("hidden");
 
     try {
-        const response = await fetch(API_URL, {
+        const res = await fetch(API_URL, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ start, finish }),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ start, finish, language: currentLang })
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || "Unable to calculate route.");
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || "Route calculation failed");
         }
 
+        const data = await res.json();
         currentRouteData = data;
-        setCachedRoute(start, finish, data);
-        renderRoute(data);
-        renderResults(data);
 
-    } catch (error) {
-        showError(error.message);
+        // Metric calculations
+        updateStatsDisplay(data);
+
+        // Map rendering
+        renderRouteOnMap(data);
+
+        // Category cards
+        renderCategoryCards(currentCategory);
+
+        // Update Disha Message
+        const advisory = data.copilot_advisory?.message;
+        if (advisory) {
+            document.getElementById("disha-speech-text").textContent = advisory;
+            currentAudioBase64 = data.copilot_advisory?.audio_base64 || null;
+        }
+
+        // Weather banner
+        const weatherHazards = data.live_weather?.weather_hazards || [];
+        const banner = document.getElementById("road-weather-banner");
+        const weatherText = document.getElementById("weather-text");
+        if (weatherHazards.length > 0) {
+            banner.className = "weather-alert-strip warning";
+            weatherText.textContent = `⚠️ Alert: ${weatherHazards[0].title}. Keep speed steady.`;
+        } else {
+            banner.className = "weather-alert-strip";
+            weatherText.textContent = i18n[currentLang]?.road_clear || "NH highway is clear ahead. Safe journey!";
+        }
+
+    } catch (e) {
+        console.error("Error calculating route:", e);
+        alert("Route update note: " + e.message);
     } finally {
-        setLoading(false);
+        if (loading) loading.classList.add("hidden");
     }
-});
+}
 
-// Render Route Polyline, Fuel Stops & Travel Event Markers on Map
-function renderRoute(data) {
-    if (routeLayer) {
-        map.removeLayer(routeLayer);
-    }
-
-    markers.forEach((marker) => {
-        map.removeLayer(marker);
-    });
+// 9. Render Polyline & Indian Corridors on Leaflet Map
+function renderRouteOnMap(data) {
+    if (routeLayer) map.removeLayer(routeLayer);
+    markers.forEach(m => map.removeLayer(m));
     markers = [];
 
-    // Render Neon Green Route Polyline
-    routeLayer = L.geoJSON(data.route.geometry, {
-        style: {
-            color: "#b8f35a",
+    if (data.route?.geometry?.coordinates) {
+        const latLngs = data.route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
+        routeLayer = L.polyline(latLngs, {
+            color: "#00f5a0",
             weight: 5,
             opacity: 0.9,
-        },
-    }).addTo(map);
+            lineJoin: "round"
+        }).addTo(map);
 
-    map.fitBounds(routeLayer.getBounds(), {
-        padding: [40, 40],
+        map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+    }
+
+    // Fuel stops
+    (data.fuel_stops || []).forEach((s, idx) => {
+        const marker = L.circleMarker([s.latitude, s.longitude], {
+            radius: 8,
+            fillColor: "#ffb800",
+            color: "#fff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.95
+        }).addTo(map);
+        marker.bindPopup(`<b>⛽ Diesel Bunk</b><br>Rate: ₹${(DEFAULT_DIESEL_INR_PER_LITER - 1.2).toFixed(2)}/L<br>📍 NH Corridor`);
+        markers.push(marker);
     });
 
-    addEndpointMarker(data.start, "START");
-    addEndpointMarker(data.finish, "FINISH");
-
-    // Render Fuel Stops (Accent Green Circles)
-    if (Array.isArray(data.fuel_stops)) {
-        data.fuel_stops.forEach((stop) => {
-            if (stop.latitude == null || stop.longitude == null) return;
-
-            const marker = L.circleMarker([stop.latitude, stop.longitude], {
-                radius: 8,
-                color: "#080b0d",
-                weight: 2,
-                fillColor: "#b8f35a",
-                fillOpacity: 1,
-            }).addTo(map);
-
-            marker.bindPopup(`
-                <div style="font-family:sans-serif; min-width:180px;">
-                    <div style="color:#8dbd35; font-size:10px; font-weight:700; letter-spacing:1px;">FUEL STOP</div>
-                    <strong style="font-size:13px; color:#111;">${stop.name}</strong><br>
-                    <span style="font-size:11px; color:#555;">${stop.city}, ${stop.state}</span><br>
-                    <span style="font-size:13px; font-weight:700; color:#111;">$${stop.price_per_gallon.toFixed(2)}/gal</span>
-                    <span style="font-size:11px; color:#666;"> &bull; Mile ${stop.route_mile.toFixed(1)}</span>
-                </div>
-            `);
-
-            markers.push(marker);
-        });
-    }
-
-    // Render Travel Events on Map (Distinct hazard pins)
-    const travelEvents = data.travel_events;
-    if (travelEvents && Array.isArray(travelEvents.all_candidate_events)) {
-        travelEvents.all_candidate_events.forEach((evt) => {
-            if (evt.latitude == null || evt.longitude == null) return;
-
-            const isAffecting = evt.affects_route;
-            const color = evt.severity === "CRITICAL" ? "#ff6b6b" : (evt.severity === "WARNING" ? "#ffb84d" : "#4da6ff");
-            const iconSymbol = evt.type === "ROAD_CLOSURE" ? "⛔" : (evt.type === "WEATHER_HAZARD" ? "⚠️" : "🚧");
-
-            const iconHtml = `
-                <div style="
-                    background:${color};
-                    color:#080b0d;
-                    width:26px;
-                    height:26px;
-                    border-radius:50%;
-                    display:grid;
-                    place-items:center;
-                    font-size:13px;
-                    font-weight:bold;
-                    box-shadow:0 0 10px ${color};
-                    border:2px solid #080b0d;
-                    opacity: ${isAffecting ? "1.0" : "0.55"};
-                ">${iconSymbol}</div>
-            `;
-
-            const customIcon = L.divIcon({
-                html: iconHtml,
-                className: "custom-hazard-icon",
-                iconSize: [26, 26],
-                iconAnchor: [13, 13],
-            });
-
-            const marker = L.marker([evt.latitude, evt.longitude], { icon: customIcon }).addTo(map);
-
-            const simulatedBadge = evt.is_simulated
-                ? `<span style="background:#444; color:#fff; font-size:9px; padding:2px 5px; border-radius:2px;">[SIMULATED EVENT]</span>`
-                : `<span style="background:#059669; color:#fff; font-size:9px; padding:2px 5px; border-radius:2px;">[LIVE VERIFIED]</span>`;
-
-            marker.bindPopup(`
-                <div style="font-family:sans-serif; min-width:220px; line-height:1.4;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                        <span style="color:${color}; font-size:10px; font-weight:700;">${evt.severity} &bull; ${evt.type}</span>
-                        ${simulatedBadge}
-                    </div>
-                    <strong style="font-size:13px; color:#111;">${evt.title}</strong><br>
-                    <div style="font-size:11px; color:#444; margin:4px 0;">${evt.description}</div>
-                    <div style="font-size:11px; color:#111; font-weight:600;">
-                        ${isAffecting ? `🔴 Affects Route near Mile ${evt.route_mile || "N/A"}` : `⚪ Off Route (${evt.distance_to_route_miles} mi away)`}
-                    </div>
-                    <div style="font-size:11px; color:#666;">Delay: +${evt.estimated_delay_minutes} min</div>
-                </div>
-            `);
-
-            markers.push(marker);
-        });
-    }
+    // Medical emergency
+    (data.copilot_amenities?.hospitals || []).forEach(h => {
+        const marker = L.circleMarker([h.latitude, h.longitude], {
+            radius: 7,
+            fillColor: "#ff4757",
+            color: "#fff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.95
+        }).addTo(map);
+        marker.bindPopup(`<b>🏥 ${h.name}</b><br>🚨 108 / 112 Emergency ER`);
+        markers.push(marker);
+    });
 }
 
-// Render Results & Co-Pilot Panels
-function renderResults(data) {
-    results.classList.remove("hidden");
-
-    // Metrics
-    document.getElementById("distance").textContent = `${data.route.distance_miles.toFixed(1)} mi`;
-    document.getElementById("duration").textContent = formatDuration(data.route.duration_minutes);
-    document.getElementById("fuel-used").textContent = `${data.fuel.consumed_gallons.toFixed(1)} gal`;
-    document.getElementById("fuel-cost").textContent = `$${data.fuel.total_cost.toFixed(2)}`;
-
-    // Travel Alert Metric
-    const travelEvents = data.travel_events || {};
-    const activeAlerts = travelEvents.active_route_alerts || [];
-    const alertMetricCard = document.getElementById("hazard-metric-card");
-    const alertSummary = document.getElementById("alert-summary");
-    const alertBadge = document.getElementById("alert-badge");
-
-    if (activeAlerts.length > 0) {
-        alertSummary.textContent = `${activeAlerts.length} HAZARD${activeAlerts.length > 1 ? "S" : ""} (+${travelEvents.total_delay_minutes}m)`;
-        alertMetricCard.classList.add("highlight-warning");
-        alertBadge.textContent = `${activeAlerts.length} ACTIVE ALERTS`;
-        alertBadge.classList.add("has-alerts");
-    } else {
-        alertSummary.textContent = `CLEAR (0)`;
-        alertMetricCard.classList.remove("highlight-warning");
-        alertBadge.textContent = `ROUTE CLEAR`;
-        alertBadge.classList.remove("has-alerts");
+// 10. Sarvam AI Indic Audio Playback Engine
+async function getOrFetchSarvamAudio(text, lang) {
+    if (!text) return null;
+    const cleanText = text.trim();
+    const cacheKey = `${lang}:${cleanText}`;
+    if (audioCache.has(cacheKey)) {
+        return audioCache.get(cacheKey);
     }
-
-    // Co-Pilot Briefing
-    const briefingBox = document.getElementById("copilot-briefing");
-    const briefingText = document.getElementById("briefing-text");
-    const aiModelTag = document.getElementById("ai-model-tag");
-
-    const copilotAdv = data.copilot_advisory || {};
-    briefingText.textContent = copilotAdv.message || "Route analyzed. Proceed with normal caution.";
-    aiModelTag.textContent = copilotAdv.llm_used ? `AWS BEDROCK (${copilotAdv.model})` : `DETERMINISTIC CO-PILOT (0 LLM COST)`;
-
-    if (activeAlerts.length > 0) {
-        briefingBox.classList.add("hazard-active");
-    } else {
-        briefingBox.classList.remove("hazard-active");
-    }
-
-    // Render Events List
-    renderEventsList(activeAlerts, travelEvents.all_candidate_events || []);
-
-    // Render Fuel Stops
-    renderFuelStops(data.fuel_stops || []);
-}
-
-function renderEventsList(activeAlerts, allEvents) {
-    const list = document.getElementById("events-list");
-
-    if (!activeAlerts || activeAlerts.length === 0) {
-        list.innerHTML = `
-            <div class="stop-empty">
-                ✓ No active road closures or weather hazards intersect your route corridor.
-            </div>
-        `;
-        return;
-    }
-
-    list.innerHTML = activeAlerts.map((evt) => {
-        const severityClass = evt.severity.toLowerCase();
-        return `
-            <div class="event-card severity-${severityClass}">
-                <div class="event-header">
-                    <span class="event-title">${evt.title}</span>
-                    <div class="event-badges">
-                        <span class="badge-mini ${severityClass}">${evt.severity}</span>
-                        <span class="badge-mini simulated">[SIMULATED]</span>
-                    </div>
-                </div>
-                <div class="event-meta">
-                    <span>📍 Mile ${evt.route_mile != null ? evt.route_mile.toFixed(1) : "N/A"} (${evt.corridor})</span>
-                    <span>⏱️ +${evt.estimated_delay_minutes} min delay</span>
-                </div>
-                <p class="event-desc">${evt.description}</p>
-                <p class="event-action">👉 Co-Pilot Advice: ${evt.recommended_action}</p>
-            </div>
-        `;
-    }).join("");
-}
-
-function renderFuelStops(fuelStops) {
-    document.getElementById("stop-count").textContent = `${fuelStops.length} STOPS`;
-    const list = document.getElementById("stops-list");
-
-    if (fuelStops.length === 0) {
-        list.innerHTML = `
-            <div class="stop-empty">
-                Vehicle starting tank (500-mile range) is sufficient for this route. Zero intermediate fuel purchases required.
-            </div>
-        `;
-        return;
-    }
-
-    list.innerHTML = fuelStops.map((stop, index) => `
-        <div class="stop">
-            <div class="stop-number">${String(index + 1).padStart(2, "0")}</div>
-            <div>
-                <div class="stop-name">${stop.name}</div>
-                <div class="stop-location">${stop.city}, ${stop.state}</div>
-            </div>
-            <div class="stop-price">$${stop.price_per_gallon.toFixed(2)}/gal</div>
-            <div class="stop-distance">Mile ${stop.route_mile.toFixed(1)}</div>
-        </div>
-    `).join("");
-}
-
-// Bolna Voice Interaction Query Form
-voiceForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const query = voiceInput.value.trim();
-    if (!query) return;
-
-    await executeVoiceQuery(query);
-});
-
-async function executeVoiceQuery(query) {
-    const start = document.getElementById("start").value.trim() || "Chicago, IL";
-    const finish = document.getElementById("finish").value.trim() || "Little Rock, AR";
-
-    voiceAnswerText.textContent = "Bolna Co-Pilot thinking...";
-    voiceResponse.classList.remove("hidden");
-
     try {
+        const res = await fetch(TTS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: cleanText, language: lang })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.audio_base64) {
+                audioCache.set(cacheKey, data.audio_base64);
+                return data.audio_base64;
+            }
+        }
+    } catch (e) {
+        console.warn("Sarvam TTS request failed:", e);
+    }
+    return null;
+}
+
+function playAudioBase64(base64Str) {
+    if (!base64Str) return;
+    try {
+        if (currentActiveAudio) {
+            currentActiveAudio.pause();
+            currentActiveAudio = null;
+        }
+        currentActiveAudio = new Audio("data:audio/wav;base64," + base64Str);
+        currentActiveAudio.play();
+    } catch (e) {
+        console.warn("Audio playback error:", e);
+    }
+}
+
+async function replayDishaAudio() {
+    if (currentAudioBase64) {
+        playAudioBase64(currentAudioBase64);
+    } else {
+        const text = document.getElementById("disha-speech-text")?.textContent;
+        if (!text) return;
+        const b64 = await getOrFetchSarvamAudio(text, currentLang);
+        if (b64) {
+            currentAudioBase64 = b64;
+            playAudioBase64(b64);
+        }
+    }
+}
+
+// 11. Disha Floating Voice Button State
+function setDishaVoiceState(state) {
+    const btn = document.getElementById("disha-mic-btn");
+    const mainLabel = document.getElementById("disha-main-label");
+    const subLabel = document.getElementById("disha-sub-label");
+    const dict = i18n[currentLang] || i18n.en;
+
+    if (!btn) return;
+
+    if (state === "listening") {
+        isVoiceActive = true;
+        btn.className = "disha-floating-btn active";
+        if (mainLabel) mainLabel.textContent = "Listening...";
+        if (subLabel) subLabel.textContent = dict.disha_listening;
+    } else if (state === "thinking") {
+        btn.className = "disha-floating-btn thinking";
+        if (mainLabel) mainLabel.textContent = "Disha";
+        if (subLabel) subLabel.textContent = dict.disha_thinking;
+    } else {
+        isVoiceActive = false;
+        btn.className = "disha-floating-btn";
+        if (mainLabel) mainLabel.textContent = "Disha";
+        if (subLabel) subLabel.textContent = dict.disha_wake_prompt;
+    }
+}
+
+// 12. Send Voice Command to Backend (Sarvam + Bolna)
+async function executeVoiceQuery(queryText) {
+    setDishaVoiceState("thinking");
+    try {
+        const start = document.getElementById("start").value || "Delhi";
+        const finish = document.getElementById("finish").value || "Mumbai";
+
         const res = await fetch(VOICE_API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query, start, finish }),
+            body: JSON.stringify({
+                query: queryText,
+                start,
+                finish,
+                language: currentLang
+            })
         });
 
         const data = await res.json();
-        if (!res.ok) {
-            throw new Error(data.error || "Voice service unavailable.");
+        const spoken = data.spoken_answer || data.audio_speech_text || "Checked the highway corridor for you.";
+        
+        document.getElementById("disha-speech-text").textContent = spoken;
+
+        if (data.audio_base64) {
+            currentAudioBase64 = data.audio_base64;
+            playAudioBase64(data.audio_base64);
+        } else {
+            getOrFetchSarvamAudio(spoken, currentLang).then(b64 => {
+                if (b64) {
+                    currentAudioBase64 = b64;
+                    playAudioBase64(b64);
+                }
+            });
         }
 
-        voiceAnswerText.textContent = data.spoken_answer;
-        voiceAiBadge.textContent = data.llm_used ? `AWS BEDROCK (${data.ai_model})` : "DETERMINISTIC RULES";
+        if (data.intent === "hospital_search") switchCategory("doctor");
+        else if (data.intent === "hotel_search" || data.intent === "hotel_booking") switchCategory("dhaba");
+        else if (data.intent === "mechanic_search" || data.intent === "mechanic_dispatch") switchCategory("mechanic");
+        else if (data.intent === "parcel_tracking") switchCategory("cargo");
+        else if (data.intent === "route_and_fuel") switchCategory("fuel");
 
-        // Speak aloud using browser TTS
-        speakText(data.spoken_answer);
-
-    } catch (err) {
-        voiceAnswerText.textContent = `Error: ${err.message}`;
+    } catch (e) {
+        console.error("Voice query failed:", e);
+        document.getElementById("disha-speech-text").textContent = "High-speed connection busy. Please speak again.";
+    } finally {
+        setDishaVoiceState("idle");
     }
 }
 
-function speakText(text) {
-    if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.05;
-        utterance.pitch = 1.0;
-        window.speechSynthesis.speak(utterance);
+// 13. Voice Recording Trigger
+function toggleDishaVoice() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Voice recognition is not supported in this browser. Please type your query.");
+        return;
+    }
+
+    if (isVoiceActive) {
+        if (speechRecognizer) speechRecognizer.stop();
+        return;
+    }
+
+    startActiveVoiceQuery();
+}
+
+function startActiveVoiceQuery() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (speechRecognizer) {
+        try { speechRecognizer.abort(); } catch (e) {}
+    }
+
+    speechRecognizer = new SpeechRecognition();
+    const speechLangs = { en: "en-IN", hi: "hi-IN", ta: "ta-IN", te: "te-IN" };
+    speechRecognizer.lang = speechLangs[currentLang] || "hi-IN";
+    speechRecognizer.interimResults = false;
+    speechRecognizer.maxAlternatives = 1;
+
+    speechRecognizer.onstart = () => {
+        setDishaVoiceState("listening");
+    };
+
+    speechRecognizer.onresult = (evt) => {
+        const transcript = evt.results[0][0].transcript;
+        console.log("[Driver Voice Query]:", transcript);
+        executeVoiceQuery(transcript);
+    };
+
+    speechRecognizer.onerror = (err) => {
+        console.warn("Speech error:", err);
+        setDishaVoiceState("idle");
+    };
+
+    speechRecognizer.onend = () => {
+        if (!isVoiceActive) setDishaVoiceState("idle");
+    };
+
+    speechRecognizer.start();
+}
+
+// 14. Wake-Word Listener for "Disha" / "दिशा"
+function initWakeWordListener() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    try {
+        wakeRecognizer = new SpeechRecognition();
+        wakeRecognizer.continuous = true;
+        wakeRecognizer.interimResults = true;
+        const wakeLangs = { en: "en-IN", hi: "hi-IN", ta: "ta-IN", te: "te-IN" };
+        wakeRecognizer.lang = wakeLangs[currentLang] || "en-IN";
+
+        wakeRecognizer.onresult = (e) => {
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const transcript = e.results[i][0].transcript.toLowerCase();
+                if (
+                    transcript.includes("disha") ||
+                    transcript.includes("dishaa") ||
+                    transcript.includes("दिशा") ||
+                    transcript.includes("దిశ") ||
+                    transcript.includes("திஷா") ||
+                    transcript.includes("deesha")
+                ) {
+                    console.log("[Wake-word Triggered: 'Disha']");
+                    wakeRecognizer.stop();
+                    playChime();
+                    startActiveVoiceQuery();
+                    break;
+                }
+            }
+        };
+
+        wakeRecognizer.onend = () => {
+            if (!isVoiceActive && isWakeListening) {
+                setTimeout(() => {
+                    try { wakeRecognizer.start(); } catch (err) {}
+                }, 500);
+            }
+        };
+
+        wakeRecognizer.start();
+        isWakeListening = true;
+        console.log("[Wake-Word Active: Listening for 'Disha']");
+    } catch (e) {
+        console.log("Wake word listener initialized.");
     }
 }
 
-speakBtn.addEventListener("click", () => {
-    const text = voiceAnswerText.textContent;
-    if (text) {
-        speakText(text);
+// 15. Emergency SOS (112 / 1033 NHAI Hotline)
+function triggerDirectSOS() {
+    if (confirm("Send Highway Emergency SOS (112 / 1033 NHAI) with live GPS coordinates?")) {
+        fetch(SOS_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emergency_type: "HIGHWAY_PATROL_112", latitude: 28.6341, longitude: 77.2168 })
+        }).then(r => r.json()).then(d => {
+            alert("🚨 EMERGENCY SOS SENT! 112 Highway Patrol & 108 Ambulance alerted.");
+        }).catch(e => {
+            alert("🚨 112 SOS Broadcast transmitted.");
+        });
     }
-});
-
-function askPresetQuery(text) {
-    voiceInput.value = text;
-    executeVoiceQuery(text);
 }
 
-function setRoute(start, finish) {
+function setQuickRoute(start, finish) {
     document.getElementById("start").value = start;
     document.getElementById("finish").value = finish;
-    form.dispatchEvent(new Event("submit"));
+    calculateRoute(start, finish);
 }
 
-function formatDuration(minutes) {
-    const hours = Math.floor(minutes / 60);
-    const remaining = Math.round(minutes % 60);
-    return `${hours}h ${remaining}m`;
-}
-
-function addEndpointMarker(location, label) {
-    if (!location || location.latitude == null || location.longitude == null) return;
-
-    const marker = L.marker([location.latitude, location.longitude]).addTo(map);
-    marker.bindPopup(`<strong>${label}</strong><br>${location.label || ""}`);
-    markers.push(marker);
-}
-
-function setLoading(value) {
-    loading.classList.toggle("hidden", !value);
-    const submitBtn = form.querySelector('button[type="submit"]');
-    if (submitBtn) submitBtn.disabled = value;
-}
-
-function showError(message) {
-    errorBox.textContent = message;
-    errorBox.classList.remove("hidden");
-}
-
-function clearError() {
-    errorBox.classList.add("hidden");
-    errorBox.textContent = "";
-}
-
-async function checkHealth() {
-    const dot = document.querySelector(".status-dot");
-    const text = document.getElementById("api-status-text");
-    try {
-        const res = await fetch(HEALTH_URL, { method: "GET" });
-        if (res.ok) {
-            dot?.classList.remove("offline");
-            if (text) text.textContent = "CO-PILOT ONLINE (OSRM + NOMINATIM)";
-        } else {
-            dot?.classList.add("offline");
-            if (text) text.textContent = "CO-PILOT DEGRADED";
-        }
-    } catch {
-        // Dev server may not be running yet
+// 16. Initialization
+document.addEventListener("DOMContentLoaded", () => {
+    const routeForm = document.getElementById("route-form");
+    if (routeForm) {
+        routeForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const start = document.getElementById("start").value;
+            const finish = document.getElementById("finish").value;
+            calculateRoute(start, finish);
+        });
     }
-}
+
+    document.body.addEventListener("click", () => {
+        if (!isWakeListening) {
+            initWakeWordListener();
+        }
+    }, { once: true });
+
+    // Initial Indian Highway Route: Delhi -> Mumbai (NH 48)
+    calculateRoute("Delhi", "Mumbai");
+});

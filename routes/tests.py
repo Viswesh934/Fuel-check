@@ -542,5 +542,115 @@ class NewServicesAndTravelCopilotTests(TestCase):
             if evt["is_simulated"]:
                 self.assertEqual(evt["source"], "SIMULATED")
 
+    def test_copilot_hotel_booking_api(self):
+        """Tests booking a corridor hotel."""
+        res = self.client.post(
+            "/api/v1/copilot/hotels/book/",
+            {"hotel_id": "HTL-5501", "guest_name": "Trucker Joe", "rooms": 1},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "CONFIRMED")
+        self.assertIn("confirmation_code", res.data)
+        self.assertTrue(res.data["truck_parking"])
+
+    def test_copilot_mechanic_dispatch_api(self):
+        """Tests requesting roadside mechanic dispatch."""
+        res = self.client.post(
+            "/api/v1/copilot/mechanics/request/",
+            {"mechanic_id": "MCH-5501", "issue": "Punctured Drive Tyre"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "DISPATCHED")
+        self.assertIn("dispatch_id", res.data)
+        self.assertIn("estimated_arrival_minutes", res.data)
+
+    def test_copilot_parcel_drop_api(self):
+        """Tests confirming a cargo delivery drop."""
+        res = self.client.post(
+            "/api/v1/copilot/parcels/drop/",
+            {"tracking_id": "TRK-IND-8821", "notes": "Unloaded at Bay 4B"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "DELIVERED")
+        self.assertIn("proof_of_delivery", res.data)
+
+    def test_copilot_hospital_alert_api(self):
+        """Tests sending emergency notification to hospital ER."""
+        res = self.client.post(
+            "/api/v1/copilot/hospitals/alert/",
+            {"hospital_id": "HSP-5501", "condition": "Driver chest discomfort"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "ER_ALERTED_INCOMING")
+        self.assertIn("alert_id", res.data)
+        self.assertIn("emergency_phone", res.data)
+
+    def test_copilot_sos_api(self):
+        """Tests triggering emergency SOS broadcast."""
+        res = self.client.post(
+            "/api/v1/copilot/sos/",
+            {"latitude": 38.627, "longitude": -90.199},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "ACTIVE_SOS_BROADCAST")
+        self.assertIn("incident_id", res.data)
+        self.assertGreater(len(res.data["dispatched_services"]), 0)
+
+    def test_voice_query_multi_intent_routing(self):
+        """Tests that spoken queries about hotels, mechanics, SOS route appropriately."""
+        with patch("routes.services.bolna_service.GeocodingService") as mock_geo_cls, \
+             patch("routes.services.bolna_service.RoutingService") as mock_route_cls:
+            mock_geo = mock_geo_cls.return_value
+            mock_geo.geocode.side_effect = [
+                {"longitude": -87.66, "latitude": 41.88, "label": "Chicago, IL"},
+                {"longitude": -92.28, "latitude": 34.74, "label": "Little Rock, AR"},
+                {"longitude": -87.66, "latitude": 41.88, "label": "Chicago, IL"},
+                {"longitude": -92.28, "latitude": 34.74, "label": "Little Rock, AR"},
+                {"longitude": -87.66, "latitude": 41.88, "label": "Chicago, IL"},
+                {"longitude": -92.28, "latitude": 34.74, "label": "Little Rock, AR"},
+            ]
+            mock_route = mock_route_cls.return_value
+            mock_route.get_route.return_value = {
+                "distance_meters": 650 * 1609.344,
+                "duration_seconds": 36000,
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-87.66, 41.88], [-90.20, 38.63], [-92.28, 34.74]],
+                },
+            }
+
+            # 1. Hotel query
+            res_hotel = self.client.post(
+                "/api/v1/voice/query/",
+                {"query": "Find me a motel with truck parking", "start": "Chicago, IL", "finish": "Little Rock, AR"},
+                format="json",
+            )
+            self.assertEqual(res_hotel.status_code, status.HTTP_200_OK)
+            self.assertEqual(res_hotel.data["intent"], "hotel_search")
+
+            # 2. Mechanic query
+            res_mech = self.client.post(
+                "/api/v1/voice/query/",
+                {"query": "Urgent! Call a mechanic for a tyre puncture", "start": "Chicago, IL", "finish": "Little Rock, AR"},
+                format="json",
+            )
+            self.assertEqual(res_mech.status_code, status.HTTP_200_OK)
+            self.assertEqual(res_mech.data["intent"], "mechanic_dispatch")
+
+            # 3. Emergency query
+            res_sos = self.client.post(
+                "/api/v1/voice/query/",
+                {"query": "Emergency! Highway patrol help needed", "start": "Chicago, IL", "finish": "Little Rock, AR"},
+                format="json",
+            )
+            self.assertEqual(res_sos.status_code, status.HTTP_200_OK)
+            self.assertEqual(res_sos.data["intent"], "emergency_sos")
+
+
 
 

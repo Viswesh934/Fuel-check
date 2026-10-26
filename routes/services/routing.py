@@ -20,6 +20,16 @@ class RoutingService:
         start_lon, start_lat = start[0], start[1]
         finish_lon, finish_lat = finish[0], finish[1]
 
+        # 0. AWS Routes V2 Commercial Truck Routing (if AWS_LOCATION_API_KEY is configured)
+        import os
+        aws_key = getattr(settings, "AWS_LOCATION_API_KEY", os.getenv("AWS_LOCATION_API_KEY", "")).strip()
+        if aws_key:
+            try:
+                from .aws_location_service import calculate_single_truck_route
+                return calculate_single_truck_route((start_lon, start_lat), (finish_lon, finish_lat))
+            except Exception as e:
+                logger.warning(f"AWS Routes V2 truck routing failed: {e}. Falling back to OSRM.")
+
         # 1. Mapbox Directions (if provider configured and token exists)
         if self.provider == "mapbox" and self.mapbox_token:
             try:
