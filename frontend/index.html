@@ -211,6 +211,74 @@
 
     </main>
 
+    <!-- Simulated Emergency Dispatch Call Modal (Test Mode • Does Not Connect to 112) -->
+    <div id="sos-call-modal" class="sos-call-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="sos-target-name">
+        <div class="sos-call-card">
+            <div class="sos-call-header">
+                <span class="sos-test-pill" id="sos-test-badge">⚠️ TEST SIMULATION • NOT CONNECTED TO 112</span>
+                <button type="button" class="btn-close-call" onclick="endSimulatedCall()" aria-label="Close">✕</button>
+            </div>
+
+            <!-- Pulsing Dispatch Ring Graphic -->
+            <div class="sos-avatar-wrap">
+                <div class="sos-avatar-ring ring-1"></div>
+                <div class="sos-avatar-ring ring-2"></div>
+                <div class="sos-avatar-core">
+                    <span class="sos-core-icon">🚨</span>
+                </div>
+            </div>
+
+            <!-- Target Recipient Details -->
+            <div class="sos-call-meta">
+                <h3 class="sos-target-title" id="sos-target-name">NHAI Emergency Control Room</h3>
+                <span class="sos-target-number">Hotline 112 / 1033 (National Highway Patrol)</span>
+                <div class="sos-call-status">
+                    <span class="sos-status-dot pulsing" id="sos-status-dot"></span>
+                    <span id="sos-status-label">Dialing Highway Emergency Dispatch...</span>
+                </div>
+                <div class="sos-call-timer" id="sos-call-timer">00:00</div>
+            </div>
+
+            <!-- Telemetry Fix -->
+            <div class="sos-telemetry-box">
+                <div class="sos-telemetry-row">
+                    <span class="telemetry-label">Corridor Fix:</span>
+                    <strong class="telemetry-val" id="sos-telemetry-loc">NH 48 (Delhi ➔ Mumbai Corridor)</strong>
+                </div>
+                <div class="sos-telemetry-row">
+                    <span class="telemetry-label">GPS Coords:</span>
+                    <strong class="telemetry-val" id="sos-telemetry-coords">28.4595° N, 77.0266° E (Milestone 142)</strong>
+                </div>
+                <div class="sos-telemetry-row">
+                    <span class="telemetry-label">Status:</span>
+                    <span class="telemetry-tag" id="sos-telemetry-tag">Simulating 112 Patrol Alert</span>
+                </div>
+            </div>
+
+            <!-- Live Spoken Transcript -->
+            <div class="sos-transcript-box">
+                <span class="sos-transcript-title">Disha Voice Dispatcher:</span>
+                <p id="sos-transcript-text">Connecting to test dispatch frequency. Stand by inside vehicle...</p>
+            </div>
+
+            <!-- In-Call Actions (Mute, Hang Up, Speaker) -->
+            <div class="sos-call-actions">
+                <button type="button" class="btn-call-ctrl" id="btn-toggle-mic" onclick="toggleCallMute()">
+                    <span class="ctrl-icon" id="mic-icon-call">🎙️</span>
+                    <span class="ctrl-label" id="mic-lbl-call">Mute</span>
+                </button>
+                <button type="button" class="btn-call-hangup" onclick="endSimulatedCall()">
+                    <span class="hangup-icon">📞</span>
+                    <span class="hangup-label">End Test Call</span>
+                </button>
+                <button type="button" class="btn-call-ctrl" id="btn-toggle-speaker" onclick="toggleCallSpeaker()">
+                    <span class="ctrl-icon" id="spk-icon-call">🔊</span>
+                    <span class="ctrl-label" id="spk-lbl-call">Speaker</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

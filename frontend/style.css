@@ -968,3 +968,338 @@ html, body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   17. Simulated Emergency Dispatch Call Modal (Test Mode)
+   ========================================================================== */
+.sos-call-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 17, 22, 0.88);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 16px;
+    animation: fadeInCall 0.2s ease-out;
+}
+
+.sos-call-overlay.hidden {
+    display: none;
+}
+
+.sos-call-card {
+    background: linear-gradient(180deg, #222730 0%, #191c22 100%);
+    border: 1.5px solid #3d4653;
+    border-top: 3px solid var(--red);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 400px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(222, 78, 78, 0.2);
+}
+
+.sos-call-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sos-test-pill {
+    background: rgba(229, 169, 60, 0.18);
+    color: var(--amber);
+    border: 1px solid rgba(229, 169, 60, 0.45);
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.btn-close-call {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s;
+}
+
+.btn-close-call:hover {
+    color: var(--text-bright);
+}
+
+/* Pulsing Avatar */
+.sos-avatar-wrap {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 0;
+}
+
+.sos-avatar-core {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #2b1f22;
+    border: 2px solid var(--red);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 0 15px rgba(222, 78, 78, 0.45);
+}
+
+.sos-core-icon {
+    font-size: 26px;
+}
+
+.sos-avatar-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--red);
+    opacity: 0.6;
+    animation: pulseRing 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.sos-avatar-ring.ring-2 {
+    animation-delay: 0.6s;
+}
+
+@keyframes pulseRing {
+    0% { transform: scale(0.65); opacity: 0.8; }
+    100% { transform: scale(1.45); opacity: 0; }
+}
+
+/* Call Metadata */
+.sos-call-meta {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+}
+
+.sos-target-title {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: var(--text-bright);
+    margin: 0;
+    letter-spacing: 0.2px;
+}
+
+.sos-target-number {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.sos-call-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--amber);
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.sos-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--amber);
+}
+
+.sos-status-dot.pulsing {
+    animation: blinkDot 0.8s infinite alternate;
+}
+
+.sos-status-dot.connected {
+    background: var(--green);
+}
+
+@keyframes blinkDot {
+    0% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.sos-call-timer {
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #abbacd;
+    letter-spacing: 1px;
+}
+
+/* Telemetry Box */
+.sos-telemetry-box {
+    width: 100%;
+    background: #181b20;
+    border: 1px solid #2e353f;
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 10.5px;
+}
+
+.sos-telemetry-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.telemetry-label {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.telemetry-val {
+    color: var(--text-bright);
+    font-weight: 700;
+    text-align: right;
+    font-size: 10.5px;
+}
+
+.telemetry-tag {
+    background: rgba(47, 179, 109, 0.15);
+    color: #4ed88f;
+    border: 1px solid rgba(47, 179, 109, 0.4);
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+/* Live Spoken Transcript Box */
+.sos-transcript-box {
+    width: 100%;
+    background: #14171c;
+    border: 1px solid #2a303a;
+    border-left: 3px solid var(--amber);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: #d8e2ec;
+}
+
+.sos-transcript-title {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 800;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+}
+
+.sos-transcript-box p {
+    margin: 0;
+}
+
+/* In-Call Actions */
+.sos-call-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.btn-call-ctrl {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: #252b34;
+    border: 1px solid #3d4653;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    transition: all 0.15s;
+}
+
+.btn-call-ctrl:hover {
+    background: #303742;
+    border-color: var(--amber);
+    color: var(--amber);
+}
+
+.btn-call-ctrl.active {
+    background: var(--panel-3);
+    border-color: var(--amber);
+    color: var(--amber);
+}
+
+.ctrl-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.ctrl-label {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.btn-call-hangup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--red);
+    border: 1.5px solid var(--red-dark);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    padding: 10px 18px;
+    border-radius: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(222, 78, 78, 0.4);
+    transition: transform 0.1s, background 0.15s;
+}
+
+.btn-call-hangup:hover {
+    background: #c93b3b;
+    transform: scale(1.03);
+}
+
+.btn-call-hangup:active {
+    transform: scale(0.97);
+}
+
+.hangup-icon {
+    font-size: 14px;
+    transform: rotate(135deg);
+}
+
+@keyframes fadeInCall {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}

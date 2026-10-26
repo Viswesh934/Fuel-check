@@ -879,6 +879,7 @@ async function executeVoiceQuery(queryText) {
         else if (data.intent === "mechanic_search" || data.intent === "mechanic_dispatch") switchCategory("mechanic");
         else if (data.intent === "parcel_tracking") switchCategory("cargo");
         else if (data.intent === "route_and_fuel" || data.intent === "fuel_search") switchCategory("fuel");
+        else if (data.intent === "emergency_sos") startSimulatedEmergencyCall();
     };
 
     // Check instant voice query cache
@@ -1014,18 +1015,260 @@ function initWakeWordListener() {
     }
 }
 
-// 15. Emergency SOS (112 / 1033 NHAI Hotline)
+// 15. Simulated Emergency Dispatch Call (Test Mode • Does Not Connect to Live 112)
+let phoneAudioCtx = null;
+let ringOsc1 = null;
+let ringOsc2 = null;
+let ringGain = null;
+let callDurationTimer = null;
+let callStepTimer = null;
+let callSeconds = 0;
+let isCallMuted = false;
+let isCallSpeaker = true;
+
+const testCallMessages = {
+    en: {
+        dialing: "Connecting to NHAI Emergency Dispatch...",
+        ringing: "Ringing 112 / 1033 Control Room...",
+        connected: "Simulated Dispatch Line Active",
+        ended: "Test Call Ended • Log Stored",
+        badge: "⚠️ TEST SIMULATION • NOT CONNECTED TO 112",
+        speech: "Namaste. This is the Disha Highway Emergency Dispatch test line. Your vehicle GPS on NH 48 is logged. This is an automated test simulation. Highway patrol units standing by. Stay safe inside your vehicle."
+    },
+    hi: {
+        dialing: "NHAI इमरजेंसी कंट्रोल रूम से कनेक्ट हो रहे हैं...",
+        ringing: "112 / 1033 हेल्पलाइन की घंटी बज रही है...",
+        connected: "सिम्युलेटेड टेस्ट हेल्पलाइन चालू है",
+        ended: "परीक्षण कॉल समाप्त • डेटा सुरक्षित",
+        badge: "⚠️ परीक्षण कॉल • 112 से कनेक्ट नहीं है",
+        speech: "नमस्ते। यह दिशा हाईवे इमरजेंसी हेल्पलाइन की टेस्ट लाइन है। NH 48 पर आपकी गाड़ी की लोकेशन दर्ज हो गई है। यह केवल एक परीक्षण कॉल है, आपातकालीन सेवाएं अलर्ट पर हैं। कृपया गाड़ी के अंदर सुरक्षित रहें।"
+    },
+    ta: {
+        dialing: "நெடுஞ்சாலை அவசர உதவி கட்டுப்பாட்டு அறை...",
+        ringing: "112 / 1033 அவசர உதவிக்கு அழைக்கிறது...",
+        connected: "சோதனை அவசர அழைப்பு செயலில் உள்ளது",
+        ended: "சோதனை அழைப்பு முடிந்தது • பதிவு செய்யப்பட்டது",
+        badge: "⚠️ மாதிரி சோதனை அழைப்பு • 112 உடன் இணைக்கப்படவில்லை",
+        speech: "வணக்கம். இது திஷா தேசிய நெடுஞ்சாலை அவசர உதவி மாதிரி சோதனை அழைப்பு. NH 48 இல் உங்கள் வாகனம் பதிவு செய்யப்பட்டுள்ளது. இது மாதிரி சோதனை மட்டுமே. வாகனத்திற்குள் பாதுகாப்பாக இருக்கவும்."
+    },
+    te: {
+        dialing: "జాతీయ రహదారి ఎమర్జెన్సీ డిస్పాచ్ కనెక్ట్ అవుతోంది...",
+        ringing: "112 / 1033 కంట్రోల్ రూమ్‌కు రింగ్ అవుతోంది...",
+        connected: "సిమ్యులేటెడ్ టెస్ట్ హెల్ప్‌లైన్ యాక్టివ్‌గా ఉంది",
+        ended: "టెస్ట్ కాల్ ముగిసింది • లాగ్ సేవ్ చేయబడింది",
+        badge: "⚠️ సిమ్యులేటెడ్ టెస్ట్ కాల్ • 112కి కనెక్ట్ కాలేదు",
+        speech: "నమస్తే. ఇది దిశా జాతీయ రహదారి అత్యవసర హెల్ప్‌లైన్ టెస్ట్ కాల్. NH 48 కారిడార్‌లో మీ వాహన జీపీఎస్ నమోదైంది. ఇది సిమ్యులేటెడ్ టెస్ట్ కాల్ మాత్రమే. వాహనం లోపలే సురక్షితంగా ఉండండి."
+    }
+};
+
+function startPhoneRingingAudio() {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        phoneAudioCtx = new AudioContext();
+        ringOsc1 = phoneAudioCtx.createOscillator();
+        ringOsc2 = phoneAudioCtx.createOscillator();
+        ringGain = phoneAudioCtx.createGain();
+
+        ringOsc1.type = "sine";
+        ringOsc2.type = "sine";
+        ringOsc1.frequency.setValueAtTime(400, phoneAudioCtx.currentTime);
+        ringOsc2.frequency.setValueAtTime(450, phoneAudioCtx.currentTime);
+
+        ringGain.gain.setValueAtTime(0, phoneAudioCtx.currentTime);
+        ringOsc1.connect(ringGain);
+        ringOsc2.connect(ringGain);
+        ringGain.connect(phoneAudioCtx.destination);
+
+        ringOsc1.start();
+        ringOsc2.start();
+
+        // Standard Indian telecom ringback: 0.4s beep, 0.2s pause, 0.4s beep, 2.2s silence
+        let t = phoneAudioCtx.currentTime + 0.1;
+        for (let i = 0; i < 3; i++) {
+            ringGain.gain.setValueAtTime(0.08, t);
+            ringGain.gain.setValueAtTime(0, t + 0.4);
+            ringGain.gain.setValueAtTime(0.08, t + 0.6);
+            ringGain.gain.setValueAtTime(0, t + 1.0);
+            t += 2.6;
+        }
+    } catch (e) {
+        console.warn("AudioContext tone init note:", e);
+    }
+}
+
+function stopPhoneRingingAudio() {
+    try {
+        if (ringOsc1) { ringOsc1.stop(); ringOsc1.disconnect(); ringOsc1 = null; }
+        if (ringOsc2) { ringOsc2.stop(); ringOsc2.disconnect(); ringOsc2 = null; }
+        if (ringGain) { ringGain.disconnect(); ringGain = null; }
+        if (phoneAudioCtx && phoneAudioCtx.state !== "closed") {
+            phoneAudioCtx.close();
+            phoneAudioCtx = null;
+        }
+    } catch (_) {}
+}
+
+function playCallDisconnectBeep() {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.setValueAtTime(425, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.setValueAtTime(0, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+    } catch (_) {}
+}
+
 function triggerDirectSOS() {
-    if (confirm("Send Highway Emergency SOS (112 / 1033 NHAI) with live GPS coordinates?")) {
+    startSimulatedEmergencyCall();
+}
+
+function startSimulatedEmergencyCall() {
+    const modal = document.getElementById("sos-call-modal");
+    if (!modal) return;
+
+    // Reset timers & state
+    clearInterval(callDurationTimer);
+    clearTimeout(callStepTimer);
+    callSeconds = 0;
+    isCallMuted = false;
+    isCallSpeaker = true;
+
+    const tData = testCallMessages[currentLang] || testCallMessages.en;
+    document.getElementById("sos-test-badge").textContent = tData.badge;
+    document.getElementById("sos-status-label").textContent = tData.dialing;
+    document.getElementById("sos-call-timer").textContent = "00:00";
+    document.getElementById("sos-transcript-text").textContent = "Establishing simulated dispatch frequency...";
+    const tagEl = document.getElementById("sos-telemetry-tag");
+    if (tagEl) tagEl.textContent = "Simulating 112 Broadcast";
+
+    const dot = document.getElementById("sos-status-dot");
+    if (dot) dot.className = "sos-status-dot pulsing";
+
+    // Set current route corridor info if available
+    const startLoc = document.getElementById("start")?.value || "Delhi";
+    const finishLoc = document.getElementById("finish")?.value || "Mumbai";
+    const locEl = document.getElementById("sos-telemetry-loc");
+    if (locEl) locEl.textContent = `${startLoc} ➔ ${finishLoc} (NH 48 Corridor)`;
+
+    // Show modal
+    modal.classList.remove("hidden");
+
+    // Phase 1: Play ringback audio
+    startPhoneRingingAudio();
+
+    // After 1.5s: Update label to Ringing...
+    callStepTimer = setTimeout(() => {
+        const lbl = document.getElementById("sos-status-label");
+        if (lbl) lbl.textContent = tData.ringing;
+    }, 1500);
+
+    // Phase 2: After 3.8s: Dispatcher answers (Simulated Test Broadcast)
+    setTimeout(() => {
+        stopPhoneRingingAudio();
+
+        if (dot) dot.className = "sos-status-dot connected";
+        const lbl = document.getElementById("sos-status-label");
+        if (lbl) lbl.textContent = tData.connected;
+
+        const transEl = document.getElementById("sos-transcript-text");
+        if (transEl) transEl.textContent = tData.speech;
+
+        if (tagEl) tagEl.textContent = "Test Telemetry Logged";
+
+        // Start call timer
+        callDurationTimer = setInterval(() => {
+            callSeconds++;
+            const mm = String(Math.floor(callSeconds / 60)).padStart(2, "0");
+            const ss = String(callSeconds % 60).padStart(2, "0");
+            const timerEl = document.getElementById("sos-call-timer");
+            if (timerEl) timerEl.textContent = `${mm}:${ss}`;
+
+            // Auto-hangup after 12 seconds
+            if (callSeconds >= 12) {
+                endSimulatedCall();
+            }
+        }, 1000);
+
+        // Synthesize / play automated dispatcher announcement in active language
+        if (isCallSpeaker) {
+            getOrFetchSarvamAudio(tData.speech, currentLang).then(b64 => {
+                if (b64) {
+                    playAudioBase64(b64);
+                }
+            });
+        }
+
+        // Fire non-blocking telemetry event to backend for demo completeness
         fetch(SOS_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ emergency_type: "HIGHWAY_PATROL_112", latitude: 28.6341, longitude: 77.2168 })
-        }).then(r => r.json()).then(d => {
-            alert("🚨 EMERGENCY SOS SENT! 112 Highway Patrol & 108 Ambulance alerted.");
-        }).catch(e => {
-            alert("🚨 112 SOS Broadcast transmitted.");
-        });
+            body: JSON.stringify({
+                emergency_type: "SIMULATED_TEST_BROADCAST",
+                latitude: 28.4595,
+                longitude: 77.0266,
+                is_simulation: true
+            })
+        }).catch(() => {});
+
+    }, 3800);
+}
+
+function endSimulatedCall() {
+    stopPhoneRingingAudio();
+    clearInterval(callDurationTimer);
+    clearTimeout(callStepTimer);
+
+    // Stop active spoken audio if playing
+    if (currentActiveAudio) {
+        try { currentActiveAudio.pause(); } catch (_) {}
+    }
+
+    playCallDisconnectBeep();
+
+    const tData = testCallMessages[currentLang] || testCallMessages.en;
+    const label = document.getElementById("sos-status-label");
+    if (label) label.textContent = tData.ended;
+
+    const dot = document.getElementById("sos-status-dot");
+    if (dot) dot.className = "sos-status-dot";
+
+    setTimeout(() => {
+        const modal = document.getElementById("sos-call-modal");
+        if (modal) modal.classList.add("hidden");
+    }, 1100);
+}
+
+function toggleCallMute() {
+    isCallMuted = !isCallMuted;
+    const btn = document.getElementById("btn-toggle-mic");
+    const lbl = document.getElementById("mic-lbl-call");
+    const ico = document.getElementById("mic-icon-call");
+    if (btn) btn.classList.toggle("active", isCallMuted);
+    if (lbl) lbl.textContent = isCallMuted ? "Unmute" : "Mute";
+    if (ico) ico.textContent = isCallMuted ? "🔇" : "🎙️";
+}
+
+function toggleCallSpeaker() {
+    isCallSpeaker = !isCallSpeaker;
+    const btn = document.getElementById("btn-toggle-speaker");
+    const lbl = document.getElementById("spk-lbl-call");
+    if (btn) btn.classList.toggle("active", !isCallSpeaker);
+    if (lbl) lbl.textContent = isCallSpeaker ? "Speaker" : "Earpiece";
+
+    if (!isCallSpeaker && currentActiveAudio) {
+        try { currentActiveAudio.volume = 0.3; } catch (_) {}
+    } else if (currentActiveAudio) {
+        try { currentActiveAudio.volume = 1.0; } catch (_) {}
     }
 }
 
