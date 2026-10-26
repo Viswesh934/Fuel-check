@@ -40,7 +40,7 @@ const i18n = {
         time_label: "Drive Time",
         fuel_label: "Diesel Needed",
         cost_label: "Est. Fuel Cost",
-        tab_diesel: "⛽ Diesel (₹/L)",
+        tab_diesel: "⛽ Affordable Diesel (₹/L)",
         tab_dhaba: "🏨 Dhabas & Rest",
         tab_doctor: "🏥 Doctor & Hospital",
         tab_mechanic: "🔧 Mechanic / Puncture",
@@ -59,8 +59,8 @@ const i18n = {
         legend_doctor: "Hospital",
         legend_mechanic: "Mechanic",
         legend_weather: "Weather",
-        loading_text: "Calculating highway route and cheapest diesel...",
-        disha_default_greeting: "Namaste! I am Disha. Delhi to Mumbai route and cheap diesel stops are ready. Say 'Disha' anytime!",
+        loading_text: "Calculating highway route and affordable diesel...",
+        disha_default_greeting: "Namaste! I am Disha. Delhi to Mumbai route and affordable diesel stops are ready. Say 'Disha' anytime!",
         unit_km: "km",
         unit_l: "L",
         unit_hrs: "hrs",
@@ -77,7 +77,7 @@ const i18n = {
         time_label: "ड्राइव समय",
         fuel_label: "डीज़ल खपत",
         cost_label: "डीज़ल खर्चा",
-        tab_diesel: "⛽ सस्ता डीज़ल (₹/L)",
+        tab_diesel: "⛽ किफायती डीज़ल (₹/L)",
         tab_dhaba: "🏨 ढाबा और आराम",
         tab_doctor: "🏥 डॉक्टर और अस्पताल",
         tab_mechanic: "🔧 पंचर और मिस्त्री",
@@ -96,8 +96,8 @@ const i18n = {
         legend_doctor: "अस्पताल",
         legend_mechanic: "मिस्त्री",
         legend_weather: "मौसम",
-        loading_text: "सस्ता डीज़ल और सबसे अच्छा हाईवे रूट खोज रहे हैं...",
-        disha_default_greeting: "नमस्ते! मैं दिशा हूँ। दिल्ली से मुंबई का सस्ता डीज़ल और ढाबा तैयार है। 'दिशा' बोलें कभी भी!",
+        loading_text: "किफायती डीज़ल और सबसे अच्छा हाईवे रूट खोज रहे हैं...",
+        disha_default_greeting: "नमस्ते! मैं दिशा हूँ। दिल्ली से मुंबई का किफायती डीज़ल और ढाबा तैयार है। 'दिशा' बोलें कभी भी!",
         unit_km: "किमी",
         unit_l: "ली",
         unit_hrs: "घंटे",
@@ -114,7 +114,7 @@ const i18n = {
         time_label: "பயண நேரம்",
         fuel_label: "டீசல் தேவை",
         cost_label: "டீசல் செலவு",
-        tab_diesel: "⛽ டீசல் பங்க் (₹)",
+        tab_diesel: "⛽ சிக்கனமான டீசல் (₹)",
         tab_dhaba: "🏨 தாபா & தங்குமிடம்",
         tab_doctor: "🏥 மருத்துவமனை & டாக்டர்",
         tab_mechanic: "🔧 மெக்கானிக் & பஞ்சர்",
@@ -133,8 +133,8 @@ const i18n = {
         legend_doctor: "மருத்துவமனை",
         legend_mechanic: "மெக்கானிக்",
         legend_weather: "வானிலை",
-        loading_text: "சிறந்த நெடுஞ்சாலை மற்றும் மலிவு டீசல் தேடப்படுகிறது...",
-        disha_default_greeting: "வணக்கம்! நான் திஷா. டீசல் பங்க், தாபா அல்லது உதவிக்கு 'திஷா' என்று கூறவும்!",
+        loading_text: "சிறந்த நெடுஞ்சாலை மற்றும் சிக்கனமான டீசல் தேடப்படுகிறது...",
+        disha_default_greeting: "வணக்கம்! நான் திஷா. சிக்கனமான டீசல் பங்க், தாபா அல்லது உதவிக்கு 'திஷா' என்று கூறவும்!",
         unit_km: "கி.மீ",
         unit_l: "லி",
         unit_hrs: "மணி",
@@ -151,7 +151,7 @@ const i18n = {
         time_label: "ప్రయాణ సమయం",
         fuel_label: "డీజిల్ పరిమాణం",
         cost_label: "డీజిల్ ఖర్చు",
-        tab_diesel: "⛽ చౌక డీజిల్ (₹)",
+        tab_diesel: "⛽ సరసమైన డీజిల్ (₹)",
         tab_dhaba: "🏨 ధాబా & విశ్రాంతి",
         tab_doctor: "🏥 డాక్టర్ & ఆసుపత్రి",
         tab_mechanic: "🔧 మెకానిక్ & పంక్చర్",
@@ -170,8 +170,8 @@ const i18n = {
         legend_doctor: "ఆసుపత్రి",
         legend_mechanic: "మెకానిక్",
         legend_weather: "వాతావరణం",
-        loading_text: "చౌక డీజిల్ మరియు హైవే మార్గం శోధిస్తున్నాము...",
-        disha_default_greeting: "నమస్కారం! నేను దిశను. డీజిల్ బంక్, ధాబా లేదా వైద్య సహాయం కోసం 'దిశ' అని పిలవండి!",
+        loading_text: "సరసమైన డీజిల్ మరియు హైవే మార్గం శోధిస్తున్నాము...",
+        disha_default_greeting: "నమస్కారం! నేను దిశను. సరసమైన డీజిల్ బంక్, ధాబా లేదా వైద్య సహాయం కోసం 'దిశ' అని పిలవండి!",
         unit_km: "కి.మీ",
         unit_l: "లీ",
         unit_hrs: "గం",
@@ -430,32 +430,67 @@ function renderCategoryCards(category) {
     const stops = currentRouteData.fuel_stops || [];
 
     if (category === "fuel") {
+        // 1. Interstate Fuel Arbitrage Strategy Banner (Zero-Key Realtime Engine)
+        if (currentRouteData.live_fuel_strategy && currentRouteData.live_fuel_strategy.advisory) {
+            const strat = currentRouteData.live_fuel_strategy;
+            const stratCard = document.createElement("div");
+            stratCard.className = "fuel-strategy-banner";
+            stratCard.innerHTML = `
+                <div class="strategy-header">
+                    <span class="strategy-badge">⚡ BORDER ARBITRAGE</span>
+                    <span class="strategy-savings">Save ~₹${(strat.estimated_tank_savings_inr || 1600).toLocaleString('en-IN')}</span>
+                </div>
+                <p class="strategy-msg">${strat.advisory}</p>
+            `;
+            container.appendChild(stratCard);
+        }
+
+        // 2. Daily 6:00 AM OMC Benchmark State Rates Ticker
+        const rates = (currentRouteData && currentRouteData.live_state_rates) || window.cachedStateRates || {};
+        if (Object.keys(rates).length > 0) {
+            const ticker = document.createElement("div");
+            ticker.className = "fuel-rates-ticker";
+            const pills = ["DL", "HR", "GJ", "RJ", "MH"]
+                .filter(c => rates[c])
+                .map(c => `<span class="rate-pill"><strong>${c}:</strong> ₹${rates[c].diesel_inr.toFixed(2)}</span>`)
+                .join("");
+            ticker.innerHTML = `
+                <div class="ticker-label">📊 Daily 6 AM OMC Diesel Rates (₹/L):</div>
+                <div class="ticker-pills">${pills}</div>
+            `;
+            container.appendChild(ticker);
+        }
+
         const indianBunkNames = ["IndianOil Swagat Bunk", "Bharat Petroleum Ghar", "HP Highway King Point", "Reliance Petroleum Oasis"];
         const demoStops = stops.length ? stops : [
-            { station_name: "IndianOil Swagat Bunk", city: "Kotputli Bypass (NH 48)", route_mile: 120, gallons_pumped: 25 },
-            { station_name: "Bharat Petroleum Ghar", city: "Udaipur Highway Stop", route_mile: 410, gallons_pumped: 35 }
+            { station_name: "IndianOil Swagat Bunk", city: "Kotputli Bypass (NH 48)", route_mile: 120, gallons_pumped: 25, price_per_liter: 88.35, state_code: "HR", savings_per_liter: 4.05 },
+            { station_name: "Bharat Petroleum Ghar", city: "Udaipur Highway Stop", route_mile: 410, gallons_pumped: 35, price_per_liter: 91.25, state_code: "RJ", savings_per_liter: 1.15 }
         ];
 
         demoStops.forEach((s, idx) => {
-            const bName = s.station_name || indianBunkNames[idx % indianBunkNames.length];
+            const bName = s.station_name || s.name || indianBunkNames[idx % indianBunkNames.length];
             const distKm = Math.round((s.route_mile || (idx + 1) * 260) * MILES_TO_KM);
             const pumpedL = Math.round((s.gallons_pumped || s.gallons || 30) * GALS_TO_LITERS);
-            const rateInr = (DEFAULT_DIESEL_INR_PER_LITER + (idx === 0 ? -1.25 : 0.65)).toFixed(2);
+            const rateInr = s.price_per_liter ? Number(s.price_per_liter).toFixed(2) : (DEFAULT_DIESEL_INR_PER_LITER + (idx === 0 ? -1.25 : 0.65)).toFixed(2);
             const costInr = Math.round(pumpedL * rateInr);
+            const statePill = s.state_code ? `<span class="state-pill">${s.state_code}</span>` : "";
+            const savingsBadge = s.savings_per_liter && s.savings_per_liter > 0
+                ? `<span class="card-tag tag-savings">Save ₹${Number(s.savings_per_liter).toFixed(2)}/L</span>`
+                : `<span class="card-tag tag-green">₹${rateInr} / L</span>`;
 
             const card = document.createElement("div");
             card.className = "driver-item-card";
             card.innerHTML = `
                 <div class="card-top-row">
-                    <strong class="card-name">⛽ ${bName}</strong>
-                    <span class="card-tag tag-green">₹${rateInr} / L</span>
+                    <strong class="card-name">⛽ ${bName} ${statePill}</strong>
+                    ${savingsBadge}
                 </div>
                 <div class="card-meta-row">
-                    <span>📍 ${s.city || 'Highway Exit'} (${distKm} km point)</span>
-                    <strong style="color:var(--green)">Pump: ${pumpedL} L</strong>
+                    <span>📍 ${s.city || s.state_name || 'Highway Exit'} (${distKm} km point)</span>
+                    <strong style="color:var(--green)">Pump: ${pumpedL} L @ ₹${rateInr}</strong>
                 </div>
                 <div class="card-actions-row">
-                    <span style="color:#8496a5; font-size:11px;">Total: ₹${costInr.toLocaleString('en-IN')}</span>
+                    <span style="color:#8496a5; font-size:11px;">Est. Cost: ₹${costInr.toLocaleString('en-IN')}</span>
                     <button class="btn-card-action" onclick="zoomToMarker(${s.latitude || 27.5}, ${s.longitude || 76.5})">📍 Show on Map</button>
                 </div>
             `;
@@ -582,8 +617,19 @@ async function calculateRoute(start, finish) {
         });
 
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || "Route calculation failed");
+            let errMsg = "Route calculation failed";
+            try {
+                const err = await res.json();
+                errMsg = err.error || err.detail || errMsg;
+            } catch (_) {
+                try {
+                    const raw = await res.text();
+                    errMsg = `Server error (${res.status}): ${raw.slice(0, 120)}`;
+                } catch (e) {
+                    errMsg = `Server returned status ${res.status}`;
+                }
+            }
+            throw new Error(errMsg);
         }
 
         const data = await res.json();
@@ -634,9 +680,9 @@ function renderRouteOnMap(data) {
     if (data.route?.geometry?.coordinates) {
         const latLngs = data.route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
         routeLayer = L.polyline(latLngs, {
-            color: "#00f5a0",
-            weight: 5,
-            opacity: 0.9,
+            color: "#e5a93c",
+            weight: 5.5,
+            opacity: 0.92,
             lineJoin: "round"
         }).addTo(map);
 
@@ -646,9 +692,9 @@ function renderRouteOnMap(data) {
     // Fuel stops
     (data.fuel_stops || []).forEach((s, idx) => {
         const marker = L.circleMarker([s.latitude, s.longitude], {
-            radius: 8,
-            fillColor: "#ffb800",
-            color: "#fff",
+            radius: 7.5,
+            fillColor: "#2fb36d",
+            color: "#1c2026",
             weight: 2,
             opacity: 1,
             fillOpacity: 0.95
@@ -940,6 +986,19 @@ document.addEventListener("DOMContentLoaded", () => {
             initWakeWordListener();
         }
     }, { once: true });
+
+    // Fetch zero-key daily 6 AM OMC benchmark rates
+    fetch(`${API_BASE}/api/v1/fuel/rates/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.state_rates) {
+                window.cachedStateRates = data.state_rates;
+                if (currentCategory === "fuel") {
+                    renderCategoryCards("fuel");
+                }
+            }
+        })
+        .catch(err => console.warn("Live fuel rates fetch deferred:", err));
 
     // Initial Indian Highway Route: Delhi -> Mumbai (NH 48)
     calculateRoute("Delhi", "Mumbai");

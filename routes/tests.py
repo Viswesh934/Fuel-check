@@ -651,6 +651,52 @@ class NewServicesAndTravelCopilotTests(TestCase):
             self.assertEqual(res_sos.status_code, status.HTTP_200_OK)
             self.assertEqual(res_sos.data["intent"], "emergency_sos")
 
+    def test_live_fuel_rates_api(self):
+        """Tests zero-key live fuel rate endpoint returns daily OMC benchmark rates."""
+        res = self.client.get("/api/v1/fuel/rates/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertIn("state_rates", res.data)
+        rates = res.data["state_rates"]
+        self.assertIn("DL", rates)
+        self.assertIn("HR", rates)
+        self.assertIn("MH", rates)
+        self.assertIn("GJ", rates)
+        self.assertIn("RJ", rates)
+        self.assertGreater(rates["DL"]["diesel_inr"], 80)
+        self.assertGreater(rates["MH"]["diesel_inr"], rates["DL"]["diesel_inr"])
+
+    def test_fuel_price_service_arbitrage(self):
+        """Tests deterministic state geo-mapping, station price enrichment, and tax arbitrage calculation."""
+        from routes.services.fuel_price_service import FuelPriceService
+        service = FuelPriceService()
+
+        # Deterministic state resolution along NH 48
+        self.assertEqual(service.resolve_state_from_coords(28.5, 77.1), "DL")
+        self.assertEqual(service.resolve_state_from_coords(28.2, 76.8), "HR")
+        self.assertEqual(service.resolve_state_from_coords(26.9, 75.8), "RJ")
+        self.assertEqual(service.resolve_state_from_coords(23.0, 72.5), "GJ")
+        self.assertEqual(service.resolve_state_from_coords(19.1, 72.9), "MH")
+
+        # Enrichment
+        station_hr = {"id": 1, "latitude": 28.2, "longitude": 76.8, "name": "Bawal Highway Bunk"}
+        enriched_hr = service.enrich_station_with_live_price(station_hr)
+        self.assertEqual(enriched_hr["state_code"], "HR")
+        self.assertIn("price_per_liter", enriched_hr)
+        self.assertGreater(enriched_hr["savings_per_liter"], 0)
+
+        station_mh = {"id": 2, "latitude": 19.1, "longitude": 72.9, "name": "Thane Diesel Hub"}
+        enriched_mh = service.enrich_station_with_live_price(station_mh)
+        self.assertEqual(enriched_mh["state_code"], "MH")
+
+        # Strategy calculation
+        strategy = service.generate_fuel_savings_strategy([enriched_hr, enriched_mh], language="hi")
+        self.assertTrue(strategy["has_strategy"])
+        self.assertGreater(strategy["diff_per_liter_inr"], 1.5)
+        self.assertGreater(strategy["estimated_tank_savings_inr"], 1000)
+        self.assertIn("बचत", strategy["advisory"])
+
+
 
 
 

@@ -31,6 +31,7 @@ from routes.services.copilot_services import (
     EmergencyService,
 )
 from routes.services.weather_service import analyze_route_weather_hazards
+from routes.services.fuel_price_service import FuelPriceService
 from .models import FuelStation
 from .serializers import OptimizeRouteSerializer, VoiceQuerySerializer, VoiceTTSSerializer
 
@@ -134,12 +135,22 @@ class OptimizeRouteView(APIView):
                 "distance_miles": round(distance_miles, 1),
                 "duration_minutes": round(duration_minutes, 1),
             }
+            # Live Indian OMC Fuel Rates & Interstate VAT Arbitrage (Zero API Keys)
+            fuel_price_service = FuelPriceService()
+            raw_stops = optimization_result["stops"]
+            enriched_stops = [fuel_price_service.enrich_station_with_live_price(s) for s in raw_stops]
+            fuel_strategy = fuel_price_service.generate_fuel_savings_strategy(enriched_stops, language=language)
+
             advisory = advisor_service.generate_advisory(
                 route_summary=route_summary,
                 matched_events=matched_events,
-                fuel_stops=optimization_result["stops"],
+                fuel_stops=enriched_stops,
                 language=language,
             )
+            # If border savings strategy exists, append to co-pilot advisory
+            if fuel_strategy.get("has_strategy") and fuel_strategy.get("advisory"):
+                advisory["message"] = f"{advisory['message']} {fuel_strategy['advisory']}"
+
             # Pre-synthesize high fidelity Indic voice audio
             audio_b64 = advisor_service.generate_speech_audio(
                 advisory.get("message", ""),
@@ -196,7 +207,9 @@ class OptimizeRouteView(APIView):
                         2,
                     ),
                 },
-                "fuel_stops": optimization_result["stops"],
+                "fuel_stops": enriched_stops,
+                "live_fuel_strategy": fuel_strategy,
+                "live_state_rates": fuel_price_service.get_live_fuel_rates(),
                 "legs": optimization_result["legs"],
                 "travel_events": {
                     "has_alerts": bool(combined_alerts),
@@ -320,6 +333,24 @@ class VoiceTTSView(APIView):
             "language": language,
             "text": text,
             "audio_base64": audio_b64,
+        }, status=status.HTTP_200_OK)
+
+
+class LiveFuelRatesView(APIView):
+    """
+    Zero-key public endpoint returning daily 6:00 AM state-by-state diesel and petrol rates,
+    state VAT tiers, and border arbitrage tips for commercial truckers.
+    """
+
+    def get(self, request):
+        service = FuelPriceService()
+        rates = service.get_live_fuel_rates()
+        return Response({
+            "status": "success",
+            "date": "daily_6am_omc_revision",
+            "currency": "INR (₹/L)",
+            "state_rates": rates,
+            "corridor_note": "Interstate diesel rates vary by state VAT (Delhi/Haryana lowest, Maharashtra highest).",
         }, status=status.HTTP_200_OK)
 
 

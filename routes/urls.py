@@ -6,6 +6,7 @@ from .views import (
     TravelEventsListView,
     VoiceQueryView,
     VoiceTTSView,
+    LiveFuelRatesView,
     BolnaWebhookView,
     CopilotHotelBookView,
     CopilotHospitalAlertView,
@@ -39,6 +40,11 @@ urlpatterns = [
         "v1/voice/tts/",
         VoiceTTSView.as_view(),
         name="voice-tts",
+    ),
+    path(
+        "v1/fuel/rates/",
+        LiveFuelRatesView.as_view(),
+        name="live-fuel-rates",
     ),
     path(
         "v1/bolna/webhook/",

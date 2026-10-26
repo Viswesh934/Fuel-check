@@ -75,8 +75,8 @@ class SarvamAdvisorService:
     ) -> str:
         dist_km = round(route_summary.get("distance_miles", 0) * 1.60934)
         stops_desc = ", ".join(
-            [f"{s.get('name', s.get('station_name', 'Diesel Bunk'))} ({round(s.get('route_mile', 100) * 1.60934)} km, ₹90.75/L)" for s in fuel_stops]
-        ) or "IndianOil Swagat Bunk (120 km point, ₹90.75/L)"
+            [f"{s.get('name', s.get('station_name', 'Diesel Bunk'))} ({round(s.get('route_mile', 100) * 1.60934)} km, ₹{s.get('price_per_liter', 88.35)}/L {s.get('state_code', '')})" for s in fuel_stops]
+        ) or "IndianOil Swagat Bunk (120 km point, ₹88.35/L DL)"
 
         events_desc = []
         for e in matched_events:
@@ -166,17 +166,18 @@ class SarvamAdvisorService:
 
         stop_name = fuel_stops[0].get("name", "IndianOil Swagat Bunk") if fuel_stops else "IndianOil Swagat Bunk"
         stop_km = round((fuel_stops[0].get("route_mile", 75) if fuel_stops else 75) * 1.60934)
+        stop_price = fuel_stops[0].get("price_per_liter", 88.35) if fuel_stops else 88.35
 
         # 1. Fuel / Diesel Question
         if any(w in q for w in ["diesel", "fuel", "petrol", "bunk", "डीजल", "डीज़ल", "पंप", "पेट्रोल", "டீசல்", "பங்க்", "డీజిల్", "బంక్"]):
             if is_telugu:
-                return f"ముందు {stop_km} కి.మీ దూరంలో {stop_name} ఉంది, డీజిల్ ధర ₹90.75/L. జాగ్రత్తగా నడపండి."
+                return f"ముందు {stop_km} కి.మీ దూరంలో {stop_name} ఉంది, డీజిల్ ధర ₹{stop_price}/L. జాగ్రత్తగా నడపండి."
             elif is_tamil:
-                return f"வழியில் {stop_km} கி.மீ தொலைவில் {stop_name} உள்ளது, டீசல் விலை ₹90.75/L. பாதுகாப்பாக செல்லவும்."
+                return f"வழியில் {stop_km} கி.மீ தொலைவில் {stop_name} உள்ளது, டீசல் விலை ₹{stop_price}/L. பாதுகாப்பாக செல்லவும்."
             elif is_hindi:
-                return f"आपके रास्ते में {stop_km} किमी आगे {stop_name} है, जहाँ डीज़ल ₹90.75 प्रति लीटर मिलेगा। सुरक्षित ड्राइव करें!"
+                return f"आपके रास्ते में {stop_km} किमी आगे {stop_name} है, जहाँ डीज़ल ₹{stop_price} प्रति लीटर मिलेगा। सुरक्षित ड्राइव करें!"
             else:
-                return f"The nearest diesel stop on your route is {stop_name}, {stop_km} km ahead at ₹90.75/L."
+                return f"The nearest diesel stop on your route is {stop_name}, {stop_km} km ahead at ₹{stop_price}/L."
 
         # 2. Doctor / Hospital / Medical
         if any(w in q for w in ["hospital", "doctor", "trauma", "clinic", "अस्पताल", "डॉक्टर", "दवा", "மருத்துவமனை", "டாக்டர்", "ఆసుపత్రి"]):

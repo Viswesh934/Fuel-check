@@ -20,6 +20,7 @@ from .copilot_services import (
     EmergencyService,
 )
 from .weather_service import analyze_route_weather_hazards
+from .fuel_price_service import FuelPriceService
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class BolnaVoiceService:
         self.mechanic_service = MechanicService()
         self.parcel_service = ParcelService()
         self.emergency_service = EmergencyService()
+        self.fuel_price = FuelPriceService()
 
     def answer_voice_query(
         self,
@@ -111,7 +113,9 @@ class BolnaVoiceService:
             graph = build_route_graph(nodes)
             optimization = optimize_route(nodes, graph)
             opt_result = build_optimization_result(optimization, nodes, graph)
-            stops = opt_result["stops"] if opt_result else []
+            raw_stops = opt_result["stops"] if opt_result else []
+            stops = [self.fuel_price.enrich_station_with_live_price(s) for s in raw_stops]
+            fuel_strategy = self.fuel_price.generate_fuel_savings_strategy(stops, language=lang)
 
             # Ask Sarvam Advisor for intelligent conversational response
             advisory_result = self.advisor.generate_advisory(
@@ -122,6 +126,9 @@ class BolnaVoiceService:
                 language=lang,
             )
             spoken = advisory_result["message"]
+            if fuel_strategy.get("has_strategy") and fuel_strategy.get("advisory"):
+                spoken = f"{spoken} {fuel_strategy['advisory']}"
+
             audio_b64 = self.advisor.generate_speech_audio(spoken, language=lang)
 
             return {
@@ -131,6 +138,7 @@ class BolnaVoiceService:
                 "audio_base64": audio_b64,
                 "fuel_stops_count": len(stops),
                 "fuel_stops": stops,
+                "fuel_strategy": fuel_strategy,
                 "llm_used": advisory_result.get("llm_used", True),
                 "ai_model": advisory_result.get("model", "sarvam-105b-conversations"),
                 "route_summary": route_summary,
@@ -347,7 +355,9 @@ class BolnaVoiceService:
         graph = build_route_graph(nodes)
         optimization = optimize_route(nodes, graph)
         opt_result = build_optimization_result(optimization, nodes, graph)
-        stops = opt_result["stops"] if opt_result else []
+        raw_stops = opt_result["stops"] if opt_result else []
+        stops = [self.fuel_price.enrich_station_with_live_price(s) for s in raw_stops]
+        fuel_strategy = self.fuel_price.generate_fuel_savings_strategy(stops, language=lang)
 
         event_match = self.event_service.match_events_to_route(route_points, distance_miles)
         matched_events = event_match["matched_events"]
@@ -361,6 +371,9 @@ class BolnaVoiceService:
         )
 
         spoken = advisory_result["message"]
+        if fuel_strategy.get("has_strategy") and fuel_strategy.get("advisory"):
+            spoken = f"{spoken} {fuel_strategy['advisory']}"
+
         audio_b64 = self.advisor.generate_speech_audio(spoken, language=lang)
 
         return {

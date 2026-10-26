@@ -1,29 +1,56 @@
+/**
+ * Fuel Check — Ergonomic Automotive Truck Cockpit Styling
+ * Designed for low eye strain, long-haul highway cab driving (day/night comfort).
+ * Palette: Matte Slate Charcoal, Warm Brass Ochre, Calm Highway Sage Green, Soft Road Brick Red.
+ * High readability without blinding high-contrast glares or harsh pure blacks.
+ */
+
 :root {
-    --bg: #080c10;
-    --panel: #0d1319;
-    --panel-2: #131b23;
-    --panel-3: #1a2530;
-    --border: #1f2d3a;
-    --border-light: #2c3e50;
+    /* Ergonomic Slate Charcoal & Low-Fatigue Cab Palette */
+    --bg: #1c2026;
+    --panel: #232830;
+    --panel-2: #2a313b;
+    --panel-3: #323b47;
+    --panel-card: #262d36;
 
-    --text: #f0f4f8;
-    --muted: #8496a5;
-    --dim: #506170;
+    /* Subtle Mechanical Slate Borders (Soft on the eyes) */
+    --border: #384250;
+    --border-light: #445061;
+    --border-heavy: #536277;
 
-    --green: #00f5a0;
-    --green-glow: rgba(0, 245, 160, 0.25);
-    
-    --cyan: #00d2ff;
-    --cyan-glow: rgba(0, 210, 255, 0.3);
+    /* Soothing Road Sign Typography (Soft off-white, zero halation) */
+    --text: #dbe2ea;
+    --text-bright: #edf2f7;
+    --muted: #94a3b8;
+    --dim: #64748b;
 
-    --amber: #ffb800;
-    --amber-glow: rgba(255, 184, 0, 0.25);
+    /* Warm Mellow Brass & Milestone Ochre (3000K warm tone, non-glaring) */
+    --amber: #e5a93c;
+    --amber-dark: #c98822;
+    --amber-bg: rgba(229, 169, 60, 0.12);
+    --amber-border: rgba(229, 169, 60, 0.35);
 
-    --red: #ff4757;
-    --red-glow: rgba(255, 71, 87, 0.35);
+    /* Mellow Highway Sage Green (Matte diesel indicators) */
+    --green: #2fb36d;
+    --green-dark: #238e55;
+    --green-bg: rgba(47, 179, 109, 0.12);
+    --green-border: rgba(47, 179, 109, 0.35);
 
-    --blue: #38bdf8;
-    --purple: #a78bfa;
+    /* Calm Road Hazard Crimson & 112 Siren (No piercing strobe) */
+    --red: #de4e4e;
+    --red-dark: #b83333;
+    --red-bg: rgba(222, 78, 78, 0.14);
+    --red-border: rgba(222, 78, 78, 0.4);
+
+    /* Rest Bay & Dhaba Slate Blue */
+    --blue: #4ea8de;
+    --blue-dark: #2d7dae;
+    --blue-bg: rgba(78, 168, 222, 0.12);
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-pill: 24px;
 }
 
 * {
@@ -38,8 +65,9 @@ html, body {
     overflow: hidden;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
+    font-feature-settings: "tnum" 1;
 }
 
 /* 1. App Single-Plane Container (Strict 100vh, zero scroll) */
@@ -52,46 +80,49 @@ html, body {
     overflow: hidden;
 }
 
-/* 2. Top Header Bar (52px height) */
+/* 2. Top Header Bar (Comfortable Matte Slate Bar) */
 .top-bar {
     height: 52px;
     min-height: 52px;
     max-height: 52px;
     background: var(--panel);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1.5px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 16px;
     gap: 12px;
     z-index: 1000;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 .brand-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
     flex-shrink: 0;
 }
 
 .brand-logo {
-    font-size: 22px;
-    filter: drop-shadow(0 0 8px var(--green));
+    font-size: 21px;
+    color: var(--amber);
 }
 
 .brand-title {
-    font-size: 16px;
+    font-size: 15.5px;
     font-weight: 800;
-    letter-spacing: 1px;
-    color: var(--text);
+    letter-spacing: 0.8px;
+    color: var(--text-bright);
     line-height: 1.1;
+    text-transform: uppercase;
 }
 
 .brand-sub {
     font-size: 8.5px;
     letter-spacing: 1.2px;
-    color: var(--green);
-    font-weight: 600;
+    color: var(--amber);
+    font-weight: 700;
+    text-transform: uppercase;
 }
 
 /* Route Form Inputs */
@@ -109,66 +140,84 @@ html, body {
     gap: 6px;
     background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 5px 10px;
     flex: 1;
+    transition: border-color 0.15s;
+}
+
+.input-pill:focus-within {
+    border-color: var(--amber);
 }
 
 .input-icon {
-    font-size: 13px;
+    font-size: 12px;
+    opacity: 0.85;
 }
 
 .input-pill input {
     background: transparent;
     border: none;
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 500;
+    color: var(--text-bright);
+    font-size: 12.5px;
+    font-weight: 600;
     outline: none;
     width: 100%;
 }
 
 .input-pill input::placeholder {
     color: var(--dim);
+    font-weight: 500;
 }
 
 .route-arrow {
-    color: var(--green);
-    font-size: 12px;
-    font-weight: bold;
+    color: var(--amber);
+    font-size: 11px;
+    font-weight: 800;
 }
 
+/* Ergonomic Buttons */
 .btn-find {
-    background: var(--green);
-    color: #070a0e;
-    border: none;
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-size: 12px;
+    background: var(--amber);
+    color: #1a1e24;
+    border: 1px solid var(--amber-dark);
+    border-radius: var(--radius-sm);
+    padding: 6px 14px;
+    font-size: 11.5px;
     font-weight: 700;
+    letter-spacing: 0.4px;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s ease;
+    text-transform: uppercase;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    transition: background 0.15s, transform 0.1s;
 }
 
 .btn-find:hover {
-    background: #00dc8c;
+    background: #f0b754;
+}
+
+.btn-find:active {
+    transform: translateY(1px);
 }
 
 .btn-demo-chip {
-    background: var(--panel-3);
-    border: 1px solid var(--border-light);
-    color: var(--muted);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
     font-size: 11px;
-    border-radius: 6px;
-    padding: 6px 10px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
     cursor: pointer;
     white-space: nowrap;
+    transition: all 0.15s;
 }
 
 .btn-demo-chip:hover {
-    color: var(--text);
-    border-color: var(--green);
+    border-color: var(--amber);
+    color: var(--amber);
+    background: var(--panel-3);
 }
 
 /* Top Actions */
@@ -183,7 +232,7 @@ html, body {
     display: flex;
     background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 2px;
     gap: 2px;
 }
@@ -195,34 +244,38 @@ html, body {
     font-size: 11px;
     font-weight: 600;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: 3px;
     cursor: pointer;
     transition: all 0.15s;
 }
 
 .btn-lang.active, .btn-lang:hover {
     background: var(--panel-3);
-    color: var(--green);
+    color: var(--amber);
+    border-bottom: 2px solid var(--amber);
 }
 
 .btn-sos {
     background: var(--red);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-size: 12px;
+    color: #ffffff;
+    border: 1px solid var(--red-dark);
+    border-radius: var(--radius-sm);
+    padding: 6px 13px;
+    font-size: 11.5px;
     font-weight: 800;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     cursor: pointer;
-    box-shadow: 0 0 12px var(--red-glow);
     white-space: nowrap;
-    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 1px 4px rgba(222, 78, 78, 0.35);
+    transition: background 0.15s, transform 0.1s;
 }
 
 .btn-sos:hover {
-    transform: scale(1.03);
-    box-shadow: 0 0 18px var(--red-glow);
+    background: #c93b3b;
+}
+
+.btn-sos:active {
+    transform: translateY(1px);
 }
 
 /* 3. Main Plane Grid (Left Control Panel + Right Map) */
@@ -235,56 +288,57 @@ html, body {
     height: calc(100vh - 52px);
 }
 
-/* Left Cockpit */
+/* Left Cockpit Dashboard */
 .left-cockpit {
-    background: #090e14;
-    border-right: 1px solid var(--border);
+    background: var(--bg);
+    border-right: 1.5px solid var(--border);
     display: flex;
     flex-direction: column;
-    padding: 12px;
-    gap: 10px;
+    padding: 10px 12px;
+    gap: 8px;
     overflow: hidden;
     height: 100%;
 }
 
-/* Stats Grid (4 Large Numbers) */
+/* Stats Grid (Low-Fatigue Instrument Tiles) */
 .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 6px;
 }
 
 .stat-card {
     background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .stat-card.highlight-card {
-    background: rgba(0, 245, 160, 0.08);
-    border-color: rgba(0, 245, 160, 0.35);
+    border-left: 3px solid var(--amber);
 }
 
 .stat-label {
-    font-size: 10px;
+    font-size: 9.5px;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .stat-value {
-    font-size: 18px;
+    font-size: 16.5px;
     font-weight: 800;
-    color: var(--text);
-    margin-top: 2px;
+    color: var(--text-bright);
+    margin-top: 1px;
+    letter-spacing: 0.2px;
 }
 
 .stat-card.highlight-card .stat-value {
-    color: var(--green);
+    color: var(--amber);
 }
 
 /* Road & Weather Alert Banner */
@@ -295,23 +349,23 @@ html, body {
     background: var(--panel-2);
     border: 1px solid var(--border);
     border-left: 3px solid var(--green);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 6px 10px;
-    font-size: 11.5px;
+    font-size: 11px;
 }
 
 .weather-alert-strip.warning {
     border-left-color: var(--amber);
-    background: rgba(255, 184, 0, 0.08);
+    background: var(--amber-bg);
 }
 
 .strip-icon {
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .strip-text {
     color: var(--text);
-    font-weight: 500;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -321,10 +375,10 @@ html, body {
 .driver-tabs {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    background: var(--panel-2);
+    background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 3px;
+    border-radius: var(--radius-sm);
+    padding: 2px;
     gap: 2px;
 }
 
@@ -332,10 +386,10 @@ html, body {
     background: transparent;
     border: none;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 600;
-    padding: 6px 4px;
-    border-radius: 5px;
+    padding: 5px 2px;
+    border-radius: 3px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
@@ -343,38 +397,44 @@ html, body {
     justify-content: center;
     gap: 2px;
     text-align: center;
-    transition: all 0.15s;
+    transition: all 0.12s;
     line-height: 1.1;
+}
+
+.tab-btn:hover {
+    color: var(--text-bright);
+    background: var(--panel-2);
 }
 
 .tab-btn.active {
     background: var(--panel-3);
-    color: var(--green);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    color: var(--amber);
+    border-bottom: 2px solid var(--amber);
+    font-weight: 700;
 }
 
 .tab-badge {
-    font-size: 8.5px;
+    font-size: 8px;
     background: var(--border);
     color: var(--text);
-    padding: 1px 5px;
-    border-radius: 10px;
-    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 700;
 }
 
 .tab-btn.active .tab-badge {
-    background: var(--green);
-    color: #000;
+    background: var(--amber);
+    color: #1a1e24;
 }
 
-/* Scroll Area for Category Cards (Restricted within panel) */
+/* Scroll Area for Category Cards */
 .cards-scroll-area {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     padding-right: 4px;
 }
 
@@ -384,23 +444,24 @@ html, body {
 
 .cards-scroll-area::-webkit-scrollbar-thumb {
     background: var(--border-light);
-    border-radius: 4px;
+    border-radius: 2px;
 }
 
-/* Item Card (Fuel Stop, Dhaba, Doctor, Mechanic) */
+/* Ergonomic Driver Cards */
 .driver-item-card {
-    background: var(--panel-2);
+    background: var(--panel-card);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    transition: border-color 0.15s;
+    gap: 5px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: border-color 0.12s;
 }
 
 .driver-item-card:hover {
-    border-color: var(--green);
+    border-color: var(--border-heavy);
 }
 
 .card-top-row {
@@ -411,31 +472,124 @@ html, body {
 }
 
 .card-name {
-    font-size: 12.5px;
+    font-size: 11.5px;
     font-weight: 700;
-    color: var(--text);
+    color: var(--text-bright);
     line-height: 1.2;
 }
 
 .card-tag {
-    font-size: 9.5px;
+    font-size: 9px;
     font-weight: 700;
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: 3px;
     white-space: nowrap;
 }
 
-.tag-green { background: rgba(0, 245, 160, 0.15); color: var(--green); }
-.tag-amber { background: rgba(255, 184, 0, 0.15); color: var(--amber); }
-.tag-red { background: rgba(255, 71, 87, 0.15); color: var(--red); }
-.tag-blue { background: rgba(56, 189, 248, 0.15); color: var(--blue); }
+.tag-green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.tag-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.tag-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+.tag-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(78, 168, 222, 0.3); }
+.tag-savings { background: rgba(47, 179, 109, 0.18); color: #4ed88f; border: 1px solid rgba(47, 179, 109, 0.4); }
+
+/* Live Fuel Rates & Tax Arbitrage Strategy */
+.fuel-strategy-banner {
+    background: #252219;
+    border: 1px solid #73541f;
+    border-left: 3px solid var(--amber);
+    border-radius: var(--radius-sm);
+    padding: 7px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.strategy-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+}
+
+.strategy-badge {
+    background: rgba(229, 169, 60, 0.2);
+    color: var(--amber);
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(229, 169, 60, 0.4);
+}
+
+.strategy-savings {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 10.5px;
+}
+
+.strategy-msg {
+    margin: 0;
+    font-size: 11px;
+    color: #dedede;
+    line-height: 1.35;
+}
+
+.fuel-rates-ticker {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ticker-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ticker-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.rate-pill {
+    background: var(--panel-card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 5px;
+    font-size: 10px;
+    color: var(--text);
+}
+
+.rate-pill strong {
+    color: var(--amber);
+}
+
+.state-pill {
+    background: #2b313a;
+    color: #abbacd;
+    border: 1px solid #3d4653;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 4px;
+}
 
 .card-meta-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 11px;
+    font-size: 10.5px;
     color: var(--muted);
+    font-weight: 500;
 }
 
 .card-actions-row {
@@ -443,45 +597,49 @@ html, body {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-top: 4px;
-    padding-top: 6px;
-    border-top: 1px dashed var(--border);
+    margin-top: 3px;
+    padding-top: 5px;
+    border-top: 1px solid var(--border);
 }
 
 .card-phone {
-    font-size: 11px;
-    color: var(--green);
+    font-size: 10.5px;
+    color: var(--amber);
     text-decoration: none;
     font-weight: 600;
 }
 
+.card-phone:hover {
+    text-decoration: underline;
+}
+
 .btn-card-action {
-    background: var(--panel-3);
-    border: 1px solid var(--border-light);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
     color: var(--text);
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 10.5px;
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.12s;
 }
 
 .btn-card-action:hover {
-    background: var(--green);
-    color: #000;
-    border-color: var(--green);
+    background: var(--amber);
+    color: #1a1e24;
+    border-color: var(--amber-dark);
 }
 
 /* Disha Voice Card at Left Bottom */
 .disha-voice-card {
-    background: var(--panel-2);
+    background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
     flex-shrink: 0;
 }
 
@@ -498,52 +656,51 @@ html, body {
 }
 
 .disha-pulse-dot {
-    width: 8px;
-    height: 8px;
+    width: 6.5px;
+    height: 6.5px;
     border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 8px var(--green);
-    animation: pulseGlow 1.8s infinite;
-}
-
-@keyframes pulseGlow {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.8); }
+    background: var(--amber);
+    box-shadow: 0 0 4px var(--amber);
 }
 
 .disha-title {
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 800;
-    color: var(--cyan);
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .disha-hint {
-    font-size: 10px;
+    font-size: 9.5px;
     color: var(--muted);
+    font-weight: 500;
 }
 
 .btn-replay-audio {
     background: transparent;
     border: none;
-    font-size: 14px;
+    font-size: 12.5px;
     cursor: pointer;
     color: var(--muted);
+    padding: 1px 3px;
 }
 
 .btn-replay-audio:hover {
-    color: var(--green);
+    color: var(--amber);
 }
 
 .disha-balloon {
-    background: var(--panel);
+    background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-size: 11.5px;
+    border-radius: 3px;
+    padding: 6px 8px;
+    font-size: 11px;
     line-height: 1.4;
-    color: #e2e8f0;
-    max-height: 80px;
+    color: var(--text);
+    max-height: 75px;
     overflow-y: auto;
+    font-weight: 500;
 }
 
 /* Disha Quick Chips */
@@ -555,22 +712,22 @@ html, body {
 }
 
 .disha-chip {
-    background: var(--panel-3);
-    border: 1px solid var(--border-light);
-    color: var(--muted);
-    font-size: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 9.5px;
     font-weight: 600;
-    padding: 3px 7px;
-    border-radius: 4px;
+    padding: 3px 6px;
+    border-radius: 3px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.12s;
     white-space: nowrap;
 }
 
 .disha-chip:hover {
-    color: var(--green);
-    border-color: var(--green);
-    background: rgba(0, 245, 160, 0.08);
+    border-color: var(--amber);
+    color: var(--amber);
+    background: var(--panel-3);
 }
 
 /* Disha Text Bar */
@@ -578,11 +735,11 @@ html, body {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: var(--panel);
+    background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 3px 8px;
-    margin-top: 4px;
+    border-radius: var(--radius-sm);
+    padding: 3px 7px;
+    margin-top: 3px;
 }
 
 .disha-text-bar input {
@@ -590,8 +747,9 @@ html, body {
     background: transparent;
     border: none;
     outline: none;
-    color: var(--text);
-    font-size: 11px;
+    color: var(--text-bright);
+    font-size: 10.5px;
+    font-weight: 500;
 }
 
 .disha-text-bar input::placeholder {
@@ -599,19 +757,18 @@ html, body {
 }
 
 .btn-disha-send {
-    background: var(--green);
+    background: var(--amber);
     border: none;
-    color: #000;
+    color: #1a1e24;
     font-size: 10px;
-    font-weight: bold;
-    border-radius: 4px;
-    padding: 3px 8px;
+    font-weight: 800;
+    border-radius: 2px;
+    padding: 3px 7px;
     cursor: pointer;
-    transition: background 0.15s;
 }
 
 .btn-disha-send:hover {
-    background: #00dc8c;
+    background: #f0b754;
 }
 
 /* 4. Right Map Plane */
@@ -625,25 +782,26 @@ html, body {
 #map {
     width: 100%;
     height: 100%;
-    background: #06090c;
+    background: #181c22;
 }
 
-/* Floating Map Legend */
+/* Floating Highway Road Sign Legend */
 .floating-legend {
     position: absolute;
-    top: 14px;
-    right: 14px;
+    top: 12px;
+    right: 12px;
     z-index: 999;
-    background: rgba(13, 19, 25, 0.88);
-    backdrop-filter: blur(8px);
+    background: rgba(35, 40, 48, 0.94);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    padding: 5px 9px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 10.5px;
+    gap: 9px;
+    font-size: 10px;
+    font-weight: 600;
     color: var(--muted);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
 .legend-chip {
@@ -653,55 +811,59 @@ html, body {
 }
 
 .dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
+    width: 6.5px;
+    height: 6.5px;
+    border-radius: 2px;
 }
-.dot-fuel { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.dot-fuel { background: var(--amber); }
 .dot-hotel { background: var(--blue); }
-.dot-hospital { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.dot-hospital { background: var(--red); }
 .dot-mechanic { background: var(--green); }
-.dot-weather { background: #e056fd; }
+.dot-weather { background: #b07de0; }
 
-/* 5. Disha Floating Voice Capsule Button (Centered at Bottom) */
+/* 5. Disha Tactile PTT (Push-To-Talk) Voice Capsule Button */
 .disha-floating-btn {
     position: absolute;
-    bottom: 22px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
-    background: rgba(13, 19, 25, 0.94);
-    border: 2px solid var(--green);
-    box-shadow: 0 8px 32px rgba(0, 245, 160, 0.35);
-    border-radius: 40px;
-    padding: 8px 22px;
+    background: #232932;
+    border: 1.5px solid var(--amber);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border-radius: var(--radius-pill);
+    padding: 7px 19px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 9px;
     cursor: pointer;
-    backdrop-filter: blur(10px);
-    transition: all 0.25s ease;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
     user-select: none;
 }
 
 .disha-floating-btn:hover {
-    transform: translateX(-50%) scale(1.04);
-    box-shadow: 0 10px 40px rgba(0, 245, 160, 0.55);
+    transform: translateX(-50%) scale(1.02);
+    border-color: #f0b754;
+    background: #2b323c;
+}
+
+.disha-floating-btn:active {
+    transform: translateX(-50%) scale(0.98);
 }
 
 .disha-floating-btn.active {
     border-color: var(--red);
-    box-shadow: 0 8px 36px rgba(255, 71, 87, 0.55);
+    background: #2d2225;
+    box-shadow: 0 4px 14px rgba(222, 78, 78, 0.35);
 }
 
 .disha-floating-btn.thinking {
-    border-color: var(--cyan);
-    box-shadow: 0 8px 36px rgba(0, 210, 255, 0.5);
+    border-color: var(--amber);
+    background: #2a251c;
 }
 
 .disha-btn-icon {
-    position: relative;
-    font-size: 20px;
+    font-size: 17px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -713,16 +875,17 @@ html, body {
 }
 
 .disha-main-label {
-    font-size: 13.5px;
+    font-size: 12.5px;
     font-weight: 800;
-    color: var(--text);
-    letter-spacing: 0.5px;
+    color: var(--text-bright);
+    letter-spacing: 0.6px;
     line-height: 1.1;
+    text-transform: uppercase;
 }
 
 .disha-sub-label {
-    font-size: 9.5px;
-    color: var(--green);
+    font-size: 9px;
+    color: var(--amber);
     font-weight: 600;
 }
 
@@ -730,52 +893,56 @@ html, body {
     color: var(--red);
 }
 
-/* 4 Waveform Bars */
+/* Hardware Waveform Bars */
 .disha-wavebars {
     display: flex;
     align-items: center;
     gap: 3px;
-    height: 18px;
+    height: 15px;
 }
 
 .wave-bar {
-    width: 3px;
+    width: 2.5px;
     height: 4px;
-    background: var(--green);
-    border-radius: 2px;
+    background: var(--amber);
+    border-radius: 1px;
     transition: height 0.15s ease;
 }
 
 .disha-floating-btn.active .wave-bar {
     background: var(--red);
-    animation: waveBounce 0.7s infinite alternate ease-in-out;
+    animation: barBounce 0.4s infinite alternate;
 }
 
-.bar-1 { animation-delay: 0.0s; }
-.bar-2 { animation-delay: 0.15s; }
-.bar-3 { animation-delay: 0.3s; }
-.bar-4 { animation-delay: 0.45s; }
+.disha-floating-btn.thinking .wave-bar {
+    background: var(--amber);
+    animation: barBounce 0.6s infinite alternate;
+}
 
-@keyframes waveBounce {
+.bar-1 { animation-delay: 0.1s; }
+.bar-2 { animation-delay: 0.25s; }
+.bar-3 { animation-delay: 0.15s; }
+.bar-4 { animation-delay: 0.3s; }
+
+@keyframes barBounce {
     0% { height: 4px; }
-    100% { height: 18px; }
+    100% { height: 13px; }
 }
 
-/* Loading Overlay on Map */
+/* Loading Overlay */
 .map-loading-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(8, 12, 16, 0.75);
-    backdrop-filter: blur(4px);
+    background: rgba(28, 32, 38, 0.85);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    z-index: 1001;
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 600;
+    gap: 10px;
+    color: var(--amber);
+    font-size: 12.5px;
+    font-weight: 700;
+    z-index: 1000;
 }
 
 .map-loading-overlay.hidden {
@@ -783,24 +950,14 @@ html, body {
 }
 
 .spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--border);
-    border-top-color: var(--green);
+    width: 28px;
+    height: 28px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--amber);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
     to { transform: rotate(360deg); }
-}
-
-/* Responsive adjustments for mid-size screens */
-@media (max-width: 900px) {
-    .main-plane {
-        grid-template-columns: 320px 1fr;
-    }
-    .top-route-form {
-        max-width: 450px;
-    }
 }
