@@ -2,203 +2,199 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fuel Check</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fuel Check — Truck Driver Co-Pilot</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 
-<div class="app">
+<div class="app-single-plane">
 
-    <header class="header">
-        <div class="brand">
-            <div class="brand-icon">⬡</div>
+    <!-- 1. Top Bar: App Identity, Indian Corridors, 4 Supported Languages & Emergency SOS (112) -->
+    <header class="top-bar">
+        <div class="brand-group">
+            <div class="brand-logo">⛽</div>
             <div>
-                <h1>FUEL CHECK</h1>
-                <span>TRAVEL AWARENESS & FUEL CO-PILOT</span>
+                <h1 class="brand-title" data-i18n="app_name">Fuel Check</h1>
+                <span class="brand-sub" data-i18n="app_sub">TRUCK DRIVER CO-PILOT</span>
             </div>
         </div>
 
-        <div class="status">
-            <span class="status-dot"></span>
-            <span id="api-status-text">SYSTEM ONLINE (OSRM + NOMINATIM)</span>
+        <!-- Inline Route Inputs (Indian Highways) -->
+        <form id="route-form" class="top-route-form">
+            <div class="input-pill">
+                <span class="input-icon">📍</span>
+                <input id="start" type="text" placeholder="From (e.g. Delhi)" value="Delhi" required>
+            </div>
+            <span class="route-arrow">➔</span>
+            <div class="input-pill">
+                <span class="input-icon">🏁</span>
+                <input id="finish" type="text" placeholder="To (e.g. Mumbai)" value="Mumbai" required>
+            </div>
+            <button type="submit" id="btn-find-route" class="btn-find" data-i18n="btn_find">
+                Find Route
+            </button>
+            <button type="button" class="btn-demo-chip" onclick="setQuickRoute('Delhi', 'Mumbai')">
+                Delhi ➔ Mumbai (NH 48)
+            </button>
+        </form>
+
+        <!-- Right: 4 Supported Languages (EN, हिन्दी, தமிழ், తెలుగు) & SOS -->
+        <div class="top-actions">
+            <div class="lang-selector">
+                <button type="button" class="btn-lang active" data-lang="en" onclick="changeLanguage('en')">EN</button>
+                <button type="button" class="btn-lang" data-lang="hi" onclick="changeLanguage('hi')">हिन्दी</button>
+                <button type="button" class="btn-lang" data-lang="ta" onclick="changeLanguage('ta')">தமிழ்</button>
+                <button type="button" class="btn-lang" data-lang="te" onclick="changeLanguage('te')">తెలుగు</button>
+            </div>
+
+            <!-- Emergency 112 / 1033 NHAI Hotline -->
+            <button type="button" class="btn-sos" onclick="triggerDirectSOS()" data-i18n="sos_btn">
+                🚨 SOS (112)
+            </button>
         </div>
     </header>
 
-    <main>
-        <section class="hero">
-            <div class="planner">
-                <div class="section-label">TRIP PLANNER</div>
-                <h2>Plan fuel stops and stay ahead of hazards.</h2>
-                <p class="description">
-                    Calculates optimal fuel stops within 500-mile vehicle range and monitors real-time road closures,
-                    disruptions, and weather hazards along your highway corridor.
-                </p>
+    <!-- 2. Main Viewport Plane (Strictly Zero Scroll, 100vh Single Plane) -->
+    <main class="main-plane">
 
-                <form id="route-form">
-                    <label>
-                        START LOCATION
-                        <input id="start" type="text" placeholder="e.g. Chicago, IL" value="Chicago, IL" required>
-                    </label>
+        <!-- Left Driver Panel (km, Liters, ₹ Rupees, Dhabas, Doctors, Mechanics) -->
+        <aside class="left-cockpit">
+            
+            <!-- Trip Stats (4 Big Metric Numbers: km, hrs, L, ₹) -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label" data-i18n="dist_label">Total Distance</span>
+                    <strong id="stat-distance" class="stat-value">1,414 km</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label" data-i18n="time_label">Drive Time</span>
+                    <strong id="stat-duration" class="stat-value">22.5 hrs</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label" data-i18n="fuel_label">Diesel Needed</span>
+                    <strong id="stat-fuel" class="stat-value">385 L</strong>
+                </div>
+                <div class="stat-card highlight-card">
+                    <span class="stat-label" data-i18n="cost_label">Est. Fuel Cost</span>
+                    <strong id="stat-cost" class="stat-value">₹34,980</strong>
+                </div>
+            </div>
 
-                    <label>
-                        DESTINATION
-                        <input id="finish" type="text" placeholder="e.g. Little Rock, AR" value="Little Rock, AR" required>
-                    </label>
+            <!-- Road & Weather Alert Banner -->
+            <div id="road-weather-banner" class="weather-alert-strip">
+                <span class="strip-icon">🌤️</span>
+                <span id="weather-text" class="strip-text" data-i18n="road_clear">Road is clear ahead. Safe journey!</span>
+            </div>
 
-                    <button type="submit">
-                        CALCULATE ROUTE & HAZARDS
-                        <span>→</span>
-                    </button>
+            <!-- Driver Category Navigation Tabs -->
+            <nav class="driver-tabs">
+                <button type="button" class="tab-btn active" data-tab="fuel" onclick="switchCategory('fuel')">
+                    <span data-i18n="tab_diesel">⛽ Diesel (₹/L)</span>
+                    <span id="badge-fuel" class="tab-badge">2</span>
+                </button>
+                <button type="button" class="tab-btn" data-tab="dhaba" onclick="switchCategory('dhaba')">
+                    <span data-i18n="tab_dhaba">🏨 Dhabas & Rest</span>
+                    <span id="badge-dhaba" class="tab-badge">4</span>
+                </button>
+                <button type="button" class="tab-btn" data-tab="doctor" onclick="switchCategory('doctor')">
+                    <span data-i18n="tab_doctor">🏥 Doctor & Hospital</span>
+                    <span id="badge-doctor" class="tab-badge">5</span>
+                </button>
+                <button type="button" class="tab-btn" data-tab="mechanic" onclick="switchCategory('mechanic')">
+                    <span data-i18n="tab_mechanic">🔧 Mechanic / Puncture</span>
+                    <span id="badge-mechanic" class="tab-badge">4</span>
+                </button>
+                <button type="button" class="tab-btn" data-tab="cargo" onclick="switchCategory('cargo')">
+                    <span data-i18n="tab_cargo">📦 Cargo / Bilti</span>
+                    <span id="badge-cargo" class="tab-badge">1</span>
+                </button>
+            </nav>
+
+            <!-- Active Category Cards List (Scrolls only within this container) -->
+            <div id="category-cards-container" class="cards-scroll-area">
+                <!-- Dynamically populated with Indian driver cards -->
+            </div>
+
+            <!-- Disha Voice Assistant Response Card -->
+            <div class="disha-voice-card">
+                <div class="disha-card-header">
+                    <div class="disha-avatar">
+                        <span class="disha-pulse-dot"></span>
+                        <strong class="disha-title">Disha</strong>
+                    </div>
+                    <span id="disha-status-hint" class="disha-hint" data-i18n="disha_wake_prompt">Say "Disha" or tap mic</span>
+                    <button type="button" id="btn-replay-audio" class="btn-replay-audio" title="Replay Audio" onclick="replayDishaAudio()">🔊</button>
+                </div>
+
+                <div class="disha-balloon">
+                    <p id="disha-speech-text">Namaste! I am Disha. Delhi to Mumbai route and cheap diesel stops are ready. Say 'Disha' anytime!</p>
+                </div>
+
+                <!-- Quick Driver Query Chips -->
+                <div class="disha-quick-chips">
+                    <button type="button" class="disha-chip" onclick="askDishaPreset('Where is the nearest diesel pump?')">⛽ Diesel Bunks</button>
+                    <button type="button" class="disha-chip" onclick="askDishaPreset('Where can I find dhabas and truck rest?')">🏨 Dhabas & Rest</button>
+                    <button type="button" class="disha-chip" onclick="askDishaPreset('Emergency doctor and hospital near me')">🏥 Hospitals</button>
+                    <button type="button" class="disha-chip" onclick="askDishaPreset('Call emergency truck mechanic for puncture')">🔧 Mechanics</button>
+                </div>
+
+                <!-- Optional Text Query Bar -->
+                <form id="disha-text-form" onsubmit="handleDishaTextSubmit(event)" class="disha-text-bar">
+                    <input id="disha-text-input" type="text" placeholder="Ask Disha in English, हिन्दी, தமிழ், తెలుగు..." autocomplete="off">
+                    <button type="submit" class="btn-disha-send">➔</button>
                 </form>
-
-                <div class="quick-routes">
-                    <span class="quick-label">VERIFIED ROUTES:</span>
-                    <button type="button" class="btn-chip" onclick="setRoute('Chicago, IL', 'Little Rock, AR')">Chicago → Little Rock</button>
-                    <button type="button" class="btn-chip" onclick="setRoute('St. Louis, MO', 'Houston, TX')">St. Louis → Houston</button>
-                    <button type="button" class="btn-chip" onclick="setRoute('Dallas, TX', 'Houston, TX')">Dallas → Houston (Direct)</button>
-                </div>
-
-                <div id="error" class="error hidden"></div>
             </div>
 
-            <div class="map-wrapper">
-                <div id="map"></div>
-                <div id="loading" class="map-loading hidden">
-                    CALCULATING OPTIMAL ROUTE & SCANNING HAZARDS...
-                </div>
+        </aside>
+
+        <!-- Right Panel: Full Interactive Map with Overlay Controls -->
+        <section class="map-plane">
+            <div id="map"></div>
+
+            <!-- Compact Floating Legend (Top Right) -->
+            <div class="floating-legend">
+                <span class="legend-chip"><span class="dot dot-fuel"></span> <span data-i18n="legend_fuel">Diesel (₹)</span></span>
+                <span class="legend-chip"><span class="dot dot-hotel"></span> <span data-i18n="legend_dhaba">Dhaba</span></span>
+                <span class="legend-chip"><span class="dot dot-hospital"></span> <span data-i18n="legend_doctor">Hospital</span></span>
+                <span class="legend-chip"><span class="dot dot-mechanic"></span> <span data-i18n="legend_mechanic">Mechanic</span></span>
+                <span class="legend-chip"><span class="dot dot-weather"></span> <span data-i18n="legend_weather">Weather</span></span>
             </div>
-        </section>
 
-        <section id="results" class="results hidden">
-            <!-- Metrics Row -->
-            <div class="metrics">
-                <div class="metric">
-                    <span>DISTANCE</span>
-                    <strong id="distance">—</strong>
+            <!-- Disha Floating Voice Button (Center Bottom) -->
+            <div id="disha-mic-btn" class="disha-floating-btn" onclick="toggleDishaVoice()">
+                <div class="disha-btn-icon">
+                    <span class="mic-icon">🎙️</span>
+                    <div class="mic-glow"></div>
                 </div>
 
-                <div class="metric">
-                    <span>DRIVE TIME</span>
-                    <strong id="duration">—</strong>
+                <div class="disha-btn-label-group">
+                    <span id="disha-main-label" class="disha-main-label">Disha</span>
+                    <span id="disha-sub-label" class="disha-sub-label" data-i18n="disha_wake_prompt">Say "Disha" or tap</span>
                 </div>
 
-                <div class="metric">
-                    <span>FUEL USED</span>
-                    <strong id="fuel-used">—</strong>
-                </div>
-
-                <div class="metric highlight">
-                    <span>TOTAL FUEL COST</span>
-                    <strong id="fuel-cost">—</strong>
-                </div>
-
-                <div class="metric alert-metric" id="hazard-metric-card">
-                    <span>ROUTE ALERTS</span>
-                    <strong id="alert-summary">0 ACTIVE</strong>
+                <!-- 4 Waveform Bars (Active when listening/speaking) -->
+                <div id="disha-wavebars" class="disha-wavebars">
+                    <span class="wave-bar bar-1"></span>
+                    <span class="wave-bar bar-2"></span>
+                    <span class="wave-bar bar-3"></span>
+                    <span class="wave-bar bar-4"></span>
                 </div>
             </div>
 
-            <!-- Two-Column Grid: Left = Travel Awareness & Voice Co-Pilot, Right = Fuel Stops -->
-            <div class="results-grid">
-                
-                <!-- Travel Awareness & Voice Interaction Column -->
-                <div class="copilot-column">
-                    <!-- Heads-up Alerts Section -->
-                    <div class="panel-card alerts-panel">
-                        <div class="section-heading">
-                            <div>
-                                <span class="section-label">HEADS-UP TRAVEL AWARENESS</span>
-                                <h3>Road Ahead & Weather Hazards</h3>
-                            </div>
-                            <div id="alert-badge" class="badge-pill">NO ALERTS</div>
-                        </div>
-
-                        <!-- Co-Pilot Travel Advisory Banner -->
-                        <div id="copilot-briefing" class="briefing-box">
-                            <div class="briefing-header">
-                                <span class="briefing-tag">CO-PILOT ADVISORY</span>
-                                <span id="ai-model-tag" class="model-tag">DETERMINISTIC RULES</span>
-                            </div>
-                            <p id="briefing-text">Calculating route conditions...</p>
-                        </div>
-
-                        <div id="events-list" class="events-list"></div>
-                    </div>
-
-                    <!-- Bolna Voice Agent Interaction Box -->
-                    <div class="panel-card voice-panel">
-                        <div class="section-heading">
-                            <div>
-                                <span class="section-label">VOICE INTERACTION</span>
-                                <h3>Bolna Voice Co-Pilot</h3>
-                            </div>
-                            <div class="voice-indicator">
-                                <span class="pulse-ring"></span>
-                                <span>VOICE READY</span>
-                            </div>
-                        </div>
-
-                        <p class="voice-hint">
-                            Ask a conversational question about road events or fuel stops along your route.
-                        </p>
-
-                        <div class="preset-queries">
-                            <button type="button" class="btn-query" onclick="askPresetQuery('What does this event mean for my route?')">
-                                "What does this event mean for my route?"
-                            </button>
-                            <button type="button" class="btn-query" onclick="askPresetQuery('Will the road closure affect my scheduled fuel stop?')">
-                                "Will the closure affect my fuel stop?"
-                            </button>
-                            <button type="button" class="btn-query" onclick="askPresetQuery('What are the weather conditions ahead?')">
-                                "What are the weather conditions ahead?"
-                            </button>
-                        </div>
-
-                        <form id="voice-query-form" class="voice-form">
-                            <div class="input-with-button">
-                                <input id="voice-input" type="text" placeholder="Ask Bolna about conditions on the road ahead...">
-                                <button type="submit" id="voice-submit-btn">ASK</button>
-                                <button type="button" id="speak-answer-btn" class="speak-btn" title="Read Answer Aloud">🔊</button>
-                            </div>
-                        </form>
-
-                        <div id="voice-response" class="voice-response hidden">
-                            <div class="voice-balloon">
-                                <div class="balloon-header">
-                                    <strong>BOLNA CO-PILOT:</strong>
-                                    <span id="voice-ai-badge" class="badge-mini">AI GROUNDED</span>
-                                </div>
-                                <p id="voice-answer-text"></p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Fuel Stops Column -->
-                <div class="stops-column">
-                    <div class="panel-card stops-panel">
-                        <div class="section-heading">
-                            <div>
-                                <span class="section-label">OPTIMIZED REFUELLING PLAN</span>
-                                <h3>Fuel Stops</h3>
-                            </div>
-                            <div id="stop-count" class="badge-pill">0 STOPS</div>
-                        </div>
-
-                        <div id="stops-list" class="stops-list"></div>
-                    </div>
-                </div>
-
+            <!-- Map Loading Indicator -->
+            <div id="map-loading" class="map-loading-overlay hidden">
+                <div class="spinner"></div>
+                <span data-i18n="loading_text">Calculating best highway route & cheap diesel...</span>
             </div>
         </section>
+
     </main>
 
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./app.js"></script>
-
 </body>
 </html>

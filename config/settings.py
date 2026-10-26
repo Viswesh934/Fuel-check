@@ -29,27 +29,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-vz!lia-+r-24$+s_v8h-(i@#9+b*mw_@#ek=#c+m3vkuhjzm%t")
 
-# Routing & Geocoding configuration (OSRM & Nominatim by default, no API keys required)
-ROUTING_PROVIDER = os.environ.get("ROUTING_PROVIDER", "osrm").lower()
-GEOCODING_PROVIDER = os.environ.get("GEOCODING_PROVIDER", "nominatim").lower()
-ORS_API_KEY = os.environ.get("ORS_API_KEY")
-MAPBOX_ACCESS_TOKEN = os.environ.get("MAPBOX_ACCESS_TOKEN", "")
-GEOAPIFY_API_KEY = os.environ.get("GEOAPIFY_API_KEY", "")
+# AWS Location Service (Places V2 & Routes V2)
+AWS_LOCATION_API_KEY = os.environ.get("AWS_LOCATION_API_KEY", "")
+AWS_LOCATION_REGION = os.environ.get("AWS_LOCATION_REGION", os.environ.get("AWS_REGION", "ap-south-1"))
 
-# Fuel Station Sourcing (Dynamic corridor generator replaces hardcoded SQL data)
-FUEL_STATION_PROVIDER = os.environ.get("FUEL_STATION_PROVIDER", "corridor").lower()
-FUEL_API_KEY = os.environ.get("FUEL_API_KEY", "")
+# Sarvam AI Indic Models & Samvaad Configuration
+SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "")
 
-# Travel Events & Awareness
-TRAVEL_EVENTS_SOURCE = os.environ.get("TRAVEL_EVENTS_SOURCE", "both").lower()
-
-# AWS Bedrock Configuration (Conditional AI / Amazon Nova Micro)
-AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
-AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-1"))
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0")
-
-# Bolna Voice Agent Configuration
+# Bolna Voice AI Agent Platform
 BOLNA_API_KEY = os.environ.get("BOLNA_API_KEY", "")
 BOLNA_AGENT_ID = os.environ.get("BOLNA_AGENT_ID", "")
 
@@ -68,6 +55,12 @@ CACHES = {
 DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.github.dev",
+    "https://*.app.github.dev",
+    "http://localhost:*",
+    "http://127.0.0.1:*",
+]
 
 
 # Application definition

@@ -23,14 +23,22 @@ from routes.services.optimizer import (
 from routes.services.travel_events import TravelEventService
 from routes.services.bedrock_service import BedrockAdvisorService
 from routes.services.bolna_service import BolnaVoiceService
+from routes.services.copilot_services import (
+    HotelBookingService,
+    HospitalService,
+    MechanicService,
+    ParcelService,
+    EmergencyService,
+)
+from routes.services.weather_service import analyze_route_weather_hazards
 from .models import FuelStation
-from .serializers import OptimizeRouteSerializer, VoiceQuerySerializer
+from .serializers import OptimizeRouteSerializer, VoiceQuerySerializer, VoiceTTSSerializer
 
 logger = logging.getLogger(__name__)
 
 
-def get_route_cache_key(start: str, finish: str) -> str:
-    norm = f"{start.strip().lower()}|{finish.strip().lower()}"
+def get_route_cache_key(start: str, finish: str, language: str = "en") -> str:
+    norm = f"{start.strip().lower()}|{finish.strip().lower()}|{language.strip().lower()}"
     digest = hashlib.sha256(norm.encode("utf-8")).hexdigest()
     return f"route_opt:{digest}"
 
@@ -39,34 +47,39 @@ class HealthView(APIView):
     def get(self, request):
         return Response({
             "status": "ok",
-            "service": "Fuel Check Travel Awareness Co-Pilot",
-            "version": "2.0.0",
+            "service": "Fuel Check & Disha Compass Co-Pilot",
+            "version": "2.5.0",
         })
 
 
 class OptimizeRouteView(APIView):
+    """
+    Computes optimal route, fuel stops, road hazards, and co-pilot services
+    (hotels, mechanics, parcels) along the corridor.
+    """
 
     def post(self, request):
         serializer = OptimizeRouteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        start_location = serializer.validated_data["start"].strip()
-        finish_location = serializer.validated_data["finish"].strip()
+        start_location = serializer.validated_data["start"]
+        finish_location = serializer.validated_data["finish"]
+        language = serializer.validated_data.get("language", "en")
 
-        cache_key = get_route_cache_key(start_location, finish_location)
-        cached_entry = cache.get(cache_key)
-        if cached_entry is not None:
-            resp = Response(cached_entry["data"], status=cached_entry["status"])
+        cache_key = get_route_cache_key(start_location, finish_location, language)
+        cache_ttl = getattr(settings, "ROUTE_CACHE_TTL_SECONDS", 3600)
+        cached_response = cache.get(cache_key)
+
+        if cached_response is not None:
+            resp = Response(cached_response["data"], status=cached_response["status"])
             resp["X-Cache"] = "HIT"
             return resp
 
         try:
-            # 1. Geocode user locations (using Nominatim / OpenStreetMap by default)
             geocoder = GeocodingService()
             start = geocoder.geocode(start_location)
             finish = geocoder.geocode(finish_location)
 
-            # 2. Get route geometry (using OSRM directions by default)
             router = RoutingService()
             route = router.get_route(
                 (start["longitude"], start["latitude"]),
@@ -75,44 +88,19 @@ class OptimizeRouteView(APIView):
 
             distance_miles = route["distance_meters"] / 1609.344
             duration_minutes = route["duration_seconds"] / 60
+            route_points = build_route_points(route["geometry"], distance_miles)
 
-            # 3. Convert route geometry to cumulative route miles
-            route_points = build_route_points(
-                route["geometry"],
-                distance_miles,
-            )
-
-            # 4. Sourcing fuel stations (Decoupled from hardcoded SQL)
             station_service = FuelStationService()
             candidates = station_service.get_candidate_stations_for_route(
                 route_points,
                 distance_miles,
-                tolerance_miles=5.0,
             )
 
-            # 5. Build reachability graph (500 miles max range constraint)
-            nodes = build_route_nodes(
-                candidates,
-                distance_miles,
-            )
+            nodes = build_route_nodes(candidates, distance_miles)
             graph = build_route_graph(nodes)
+            optimization = optimize_route(nodes, graph)
+            optimization_result = build_optimization_result(optimization, nodes, graph)
 
-            # 6. Dynamic Programming Optimizer
-            optimization = optimize_route(
-                nodes,
-                graph,
-            )
-
-            # 7. Format fuel results
-            optimization_result = build_optimization_result(
-                optimization,
-                nodes,
-                graph,
-            )
-
-            cache_ttl = getattr(settings, "ROUTE_CACHE_TTL", 300)
-
-            # 8. Check for infeasible route
             if optimization_result is None:
                 err_data = {
                     "error": "No feasible fuel-stop plan exists for this route.",
@@ -126,46 +114,74 @@ class OptimizeRouteView(APIView):
                     {"data": err_data, "status": status.HTTP_422_UNPROCESSABLE_ENTITY},
                     timeout=cache_ttl,
                 )
-                resp = Response(err_data, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-                resp["X-Cache"] = "MISS"
-                return resp
+                return Response(err_data, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-            # 9. Deterministic route-aware travel event matching (Normal code, NOT LLM)
+            fuel_consumed = distance_miles / 10.0
+
+            # Travel Events & Hazard Matching
             event_service = TravelEventService()
             event_match_result = event_service.match_events_to_route(
                 route_points,
                 distance_miles,
             )
-
             matched_events = event_match_result["matched_events"]
 
-            # 10. Conditional AI usage via AWS Bedrock
-            # Rule: If no matching condition, NO LLM call is made (cost-conscious)
-            advisor = BedrockAdvisorService()
+            # Grounded Co-Pilot Advisory
+            advisor_service = BedrockAdvisorService()
             route_summary = {
-                "start_label": start.get("label", start_location),
-                "finish_label": finish.get("label", finish_location),
-                "distance_miles": round(distance_miles, 2),
-                "duration_minutes": round(duration_minutes, 2),
+                "start_label": start["label"],
+                "finish_label": finish["label"],
+                "distance_miles": round(distance_miles, 1),
+                "duration_minutes": round(duration_minutes, 1),
             }
-            advisory = advisor.generate_advisory(
+            advisory = advisor_service.generate_advisory(
                 route_summary=route_summary,
                 matched_events=matched_events,
                 fuel_stops=optimization_result["stops"],
+                language=language,
+            )
+            # Pre-synthesize high fidelity Indic voice audio
+            audio_b64 = advisor_service.generate_speech_audio(
+                advisory.get("message", ""),
+                language=language,
+            )
+            advisory["audio_base64"] = audio_b64
+
+            # Co-Pilot Corridor Amenities: Hotels, Hospitals, Mechanics, Freight Parcels
+            hotel_service = HotelBookingService()
+            hospital_service = HospitalService()
+            mechanic_service = MechanicService()
+            parcel_service = ParcelService()
+
+            corridor_hotels = hotel_service.get_hotels_for_route(route_points, distance_miles)
+            corridor_hospitals = hospital_service.get_hospitals_for_route(route_points, distance_miles)
+            corridor_mechanics = mechanic_service.get_mechanics_for_route(route_points, distance_miles)
+            corridor_parcels = parcel_service.get_parcels_for_route(route_points, distance_miles)
+
+            # Live Open-Meteo Weather Hazards along Corridor Checkpoints
+            weather_analysis = analyze_route_weather_hazards(route_points)
+            live_wx_hazards = weather_analysis.get("weather_hazards", [])
+            combined_alerts = list(matched_events) + live_wx_hazards
+            total_delays = event_match_result["total_delay_minutes"] + sum(
+                h.get("estimated_delay_minutes", 0) for h in live_wx_hazards
             )
 
-            fuel_consumed = distance_miles / 10
-
             response_data = {
-                "start": start,
-                "finish": finish,
-
                 "route": {
                     "distance_miles": round(distance_miles, 2),
                     "duration_minutes": round(duration_minutes, 2),
+                    "start": {
+                        "latitude": start["latitude"],
+                        "longitude": start["longitude"],
+                        "label": start["label"],
+                    },
+                    "finish": {
+                        "latitude": finish["latitude"],
+                        "longitude": finish["longitude"],
+                        "label": finish["label"],
+                    },
                     "geometry": route["geometry"],
                 },
-
                 "fuel": {
                     "mpg": 10,
                     "max_range_miles": 500,
@@ -180,23 +196,27 @@ class OptimizeRouteView(APIView):
                         2,
                     ),
                 },
-
                 "fuel_stops": optimization_result["stops"],
                 "legs": optimization_result["legs"],
-
-                # Travel-Awareness Co-Pilot extensions
                 "travel_events": {
-                    "has_alerts": event_match_result["has_matching_events"],
-                    "total_delay_minutes": event_match_result["total_delay_minutes"],
-                    "active_route_alerts": matched_events,
+                    "has_alerts": bool(combined_alerts),
+                    "total_delay_minutes": total_delays,
+                    "active_route_alerts": combined_alerts,
                     "all_candidate_events": event_match_result["all_events"],
                 },
-
                 "copilot_advisory": {
                     "message": advisory["message"],
+                    "audio_base64": advisory.get("audio_base64"),
                     "llm_used": advisory["llm_used"],
                     "model": advisory["model"],
                 },
+                "copilot_amenities": {
+                    "hotels": corridor_hotels,
+                    "hospitals": corridor_hospitals,
+                    "mechanics": corridor_mechanics,
+                    "parcels": corridor_parcels,
+                },
+                "live_weather": weather_analysis,
             }
 
             cache.set(
@@ -214,7 +234,6 @@ class OptimizeRouteView(APIView):
                 {"error": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         except Exception as exc:
             logger.exception("OptimizeRouteView unexpected exception")
             return Response(
@@ -224,11 +243,6 @@ class OptimizeRouteView(APIView):
 
 
 class TravelEventsListView(APIView):
-    """
-    Returns all registered travel events and fixtures, clearly marking
-    simulated demo events vs verified live events.
-    """
-
     def get(self, request):
         service = TravelEventService()
         events = [e.to_dict() for e in service.get_all_events()]
@@ -241,8 +255,7 @@ class TravelEventsListView(APIView):
 
 class VoiceQueryView(APIView):
     """
-    Voice Interaction endpoint for driver queries (e.g. "What does this event mean for my route?")
-    Grounded strictly in Fuel Check backend data and invoking Bedrock conditionally.
+    Voice Interaction endpoint for driver queries (hotel bookings, mechanics, parcels, SOS, fuel).
     """
 
     def post(self, request):
@@ -250,12 +263,13 @@ class VoiceQueryView(APIView):
         serializer.is_valid(raise_exception=True)
 
         query = serializer.validated_data["query"]
-        start = serializer.validated_data.get("start", "Chicago, IL")
-        finish = serializer.validated_data.get("finish", "Little Rock, AR")
+        start = serializer.validated_data.get("start", "Delhi")
+        finish = serializer.validated_data.get("finish", "Mumbai")
+        language = serializer.validated_data.get("language", "en")
 
         try:
             bolna = BolnaVoiceService()
-            result = bolna.answer_voice_query(query, start, finish)
+            result = bolna.answer_voice_query(query, start, finish, language=language)
             return Response(result, status=status.HTTP_200_OK)
         except Exception as exc:
             logger.exception("Voice query processing failed")
@@ -281,3 +295,77 @@ class BolnaWebhookView(APIView):
                 {"status": "error", "message": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class VoiceTTSView(APIView):
+    """
+    Dedicated speech synthesis endpoint powered by Sarvam bulbul:v4-flash.
+    Strictly isolated native speakers:
+      - te-IN: kavitha_te_conversation (Pure Telugu)
+      - ta-IN: gokul_ta_narration (Pure Tamil)
+      - hi-IN: aditya_hi_conversational (Pure Hindi)
+      - en-IN: simran_en_automobile (Pure English)
+    """
+
+    def post(self, request):
+        serializer = VoiceTTSSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        text = serializer.validated_data["text"]
+        language = serializer.validated_data.get("language", "en")
+
+        advisor = BedrockAdvisorService()
+        audio_b64 = advisor.generate_speech_audio(text, language=language)
+        return Response({
+            "status": "success",
+            "language": language,
+            "text": text,
+            "audio_base64": audio_b64,
+        }, status=status.HTTP_200_OK)
+
+
+# Co-Pilot Dedicated REST APIs: Hotels, Mechanics, Parcels, SOS
+
+class CopilotHotelBookView(APIView):
+    def post(self, request):
+        hotel_id = request.data.get("hotel_id", "HTL-5501")
+        guest_name = request.data.get("guest_name", "Commercial Driver")
+        rooms = int(request.data.get("rooms", 1))
+        service = HotelBookingService()
+        result = service.book_hotel(hotel_id=hotel_id, guest_name=guest_name, rooms=rooms)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class CopilotHospitalAlertView(APIView):
+    def post(self, request):
+        hospital_id = request.data.get("hospital_id", "HSP-5501")
+        condition = request.data.get("condition", "Driver Emergency Alert")
+        service = HospitalService()
+        result = service.alert_emergency_room(hospital_id=hospital_id, medical_condition=condition)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class CopilotMechanicRequestView(APIView):
+    def post(self, request):
+        mechanic_id = request.data.get("mechanic_id", "MCH-5501")
+        issue = request.data.get("issue", "Flat Tyre / Roadside Breakdown")
+        service = MechanicService()
+        result = service.request_mechanic(mechanic_id=mechanic_id, issue_type=issue)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class CopilotParcelDropView(APIView):
+    def post(self, request):
+        tracking_id = request.data.get("tracking_id", "TRK-IND-8821")
+        notes = request.data.get("notes", "Delivered at warehouse dock")
+        service = ParcelService()
+        result = service.confirm_drop(tracking_id=tracking_id, notes=notes)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class CopilotSOSView(APIView):
+    def post(self, request):
+        lat = float(request.data.get("latitude", 38.6270))
+        lng = float(request.data.get("longitude", -90.1994))
+        service = EmergencyService()
+        result = service.trigger_emergency_sos(latitude=lat, longitude=lng)
+        return Response(result, status=status.HTTP_200_OK)
