@@ -68,7 +68,7 @@ class OptimizeRouteView(APIView):
         language = serializer.validated_data.get("language", "en")
 
         cache_key = get_route_cache_key(start_location, finish_location, language)
-        cache_ttl = getattr(settings, "ROUTE_CACHE_TTL_SECONDS", 3600)
+        cache_ttl = getattr(settings, "ROUTE_CACHE_TTL", getattr(settings, "ROUTE_CACHE_TTL_SECONDS", 3600))
         cached_response = cache.get(cache_key)
 
         if cached_response is not None:
@@ -280,10 +280,22 @@ class VoiceQueryView(APIView):
         finish = serializer.validated_data.get("finish", "Mumbai")
         language = serializer.validated_data.get("language", "en")
 
+        cache_norm = f"{query.strip().lower()}|{start.strip().lower()}|{finish.strip().lower()}|{language.strip().lower()}"
+        cache_key = f"voice_q:{hashlib.sha256(cache_norm.encode('utf-8')).hexdigest()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = Response(cached, status=status.HTTP_200_OK)
+            resp["X-Cache"] = "HIT"
+            return resp
+
         try:
             bolna = BolnaVoiceService()
             result = bolna.answer_voice_query(query, start, finish, language=language)
-            return Response(result, status=status.HTTP_200_OK)
+            cache_ttl = getattr(settings, "ROUTE_CACHE_TTL", getattr(settings, "ROUTE_CACHE_TTL_SECONDS", 3600))
+            cache.set(cache_key, result, timeout=cache_ttl)
+            resp = Response(result, status=status.HTTP_200_OK)
+            resp["X-Cache"] = "MISS"
+            return resp
         except Exception as exc:
             logger.exception("Voice query processing failed")
             return Response(

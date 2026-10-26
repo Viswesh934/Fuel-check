@@ -24,20 +24,40 @@
         <form id="route-form" class="top-route-form">
             <div class="input-pill">
                 <span class="input-icon">📍</span>
-                <input id="start" type="text" placeholder="From (e.g. Delhi)" value="Delhi" required>
+                <input id="start" type="text" list="popular-highway-cities" placeholder="From (e.g. Delhi)" value="Delhi" required autocomplete="off">
             </div>
             <span class="route-arrow">➔</span>
             <div class="input-pill">
                 <span class="input-icon">🏁</span>
-                <input id="finish" type="text" placeholder="To (e.g. Mumbai)" value="Mumbai" required>
+                <input id="finish" type="text" list="popular-highway-cities" placeholder="To (e.g. Mumbai)" value="Mumbai" required autocomplete="off">
             </div>
             <button type="submit" id="btn-find-route" class="btn-find" data-i18n="btn_find">
                 Find Route
             </button>
-            <button type="button" class="btn-demo-chip" onclick="setQuickRoute('Delhi', 'Mumbai')">
-                Delhi ➔ Mumbai (NH 48)
-            </button>
+            <div class="quick-corridor-chips">
+                <button type="button" class="btn-demo-chip" onclick="setQuickRoute('Delhi', 'Mumbai')">Delhi ➔ Mumbai (NH 48)</button>
+                <button type="button" class="btn-demo-chip" onclick="setQuickRoute('Delhi', 'Jaipur')">Delhi ➔ Jaipur</button>
+                <button type="button" class="btn-demo-chip" onclick="setQuickRoute('Ahmedabad', 'Mumbai')">Ahmedabad ➔ Mumbai</button>
+            </div>
         </form>
+
+        <datalist id="popular-highway-cities">
+            <option value="Delhi">Delhi NCT (NH 48 Origin)</option>
+            <option value="Gurugram">Gurugram (Haryana)</option>
+            <option value="Rewari">Rewari (Haryana Border)</option>
+            <option value="Jaipur">Jaipur (Rajasthan)</option>
+            <option value="Ajmer">Ajmer (Rajasthan)</option>
+            <option value="Udaipur">Udaipur (Rajasthan)</option>
+            <option value="Ahmedabad">Ahmedabad (Gujarat)</option>
+            <option value="Vadodara">Vadodara (Gujarat)</option>
+            <option value="Surat">Surat (Gujarat)</option>
+            <option value="Vapi">Vapi (Gujarat / MH Border)</option>
+            <option value="Mumbai">Mumbai (Maharashtra Terminal)</option>
+            <option value="Pune">Pune (Maharashtra)</option>
+            <option value="Bengaluru">Bengaluru (Karnataka)</option>
+            <option value="Chennai">Chennai (Tamil Nadu)</option>
+            <option value="Hyderabad">Hyderabad (Telangana)</option>
+        </datalist>
 
         <!-- Right: 4 Supported Languages (EN, हिन्दी, தமிழ், తెలుగు) & SOS -->
         <div class="top-actions">

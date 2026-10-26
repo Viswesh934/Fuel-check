@@ -22,6 +22,49 @@ const SOS_URL = "/api/v1/copilot/sos/";
 const audioCache = new Map();
 let currentActiveAudio = null;
 
+// Lightweight Client-Side In-Memory & Session Storage Cache (LRU)
+class ClientCache {
+    constructor(prefix = "fc_cache_", maxEntries = 20) {
+        this.prefix = prefix;
+        this.maxEntries = maxEntries;
+        this.mem = new Map();
+        this._loadFromSession();
+    }
+
+    _loadFromSession() {
+        try {
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const k = sessionStorage.key(i);
+                if (k && k.startsWith(this.prefix)) {
+                    const raw = sessionStorage.getItem(k);
+                    if (raw) {
+                        this.mem.set(k.replace(this.prefix, ""), JSON.parse(raw));
+                    }
+                }
+            }
+        } catch (_) {}
+    }
+
+    get(key) {
+        return this.mem.get(key) || null;
+    }
+
+    set(key, val) {
+        if (this.mem.size >= this.maxEntries) {
+            const firstKey = this.mem.keys().next().value;
+            this.mem.delete(firstKey);
+            try { sessionStorage.removeItem(this.prefix + firstKey); } catch (_) {}
+        }
+        this.mem.set(key, val);
+        try {
+            sessionStorage.setItem(this.prefix + key, JSON.stringify(val));
+        } catch (_) {}
+    }
+}
+
+const clientRouteCache = new ClientCache("fc_route_", 20);
+const clientVoiceCache = new ClientCache("fc_voice_", 20);
+
 // Indian Metric & Currency Constants
 const MILES_TO_KM = 1.60934;
 const GALS_TO_LITERS = 3.78541;
@@ -604,8 +647,45 @@ function zoomToMarker(lat, lng) {
     map.flyTo([lat, lng], 11, { animate: true, duration: 1.2 });
 }
 
-// 8. Route Calculation Engine
+// 8. Route Calculation Engine with Small LRU & Session Storage Cache
 async function calculateRoute(start, finish) {
+    const cleanStart = (start || "Delhi").trim();
+    const cleanFinish = (finish || "Mumbai").trim();
+    const cacheKey = `${cleanStart.toLowerCase()}|${cleanFinish.toLowerCase()}|${currentLang}`;
+
+    const applyRouteData = (data) => {
+        currentRouteData = data;
+        updateStatsDisplay(data);
+        renderRouteOnMap(data);
+        renderCategoryCards(currentCategory);
+
+        const advisory = data.copilot_advisory?.message;
+        if (advisory) {
+            document.getElementById("disha-speech-text").textContent = advisory;
+            currentAudioBase64 = data.copilot_advisory?.audio_base64 || null;
+        }
+
+        const weatherHazards = data.live_weather?.weather_hazards || [];
+        const banner = document.getElementById("road-weather-banner");
+        const weatherText = document.getElementById("weather-text");
+        if (banner && weatherText) {
+            if (weatherHazards.length > 0) {
+                banner.className = "weather-alert-strip warning";
+                weatherText.textContent = `⚠️ Alert: ${weatherHazards[0].title}. Keep speed steady.`;
+            } else {
+                banner.className = "weather-alert-strip";
+                weatherText.textContent = i18n[currentLang]?.road_clear || "NH highway is clear ahead. Safe journey!";
+            }
+        }
+    };
+
+    // 1. Instant Cache hit (sub-millisecond UI update, 0ms latency)
+    const cachedData = clientRouteCache.get(cacheKey);
+    if (cachedData) {
+        applyRouteData(cachedData);
+        return;
+    }
+
     const loading = document.getElementById("map-loading");
     if (loading) loading.classList.remove("hidden");
 
@@ -613,7 +693,7 @@ async function calculateRoute(start, finish) {
         const res = await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ start, finish, language: currentLang })
+            body: JSON.stringify({ start: cleanStart, finish: cleanFinish, language: currentLang })
         });
 
         if (!res.ok) {
@@ -633,35 +713,8 @@ async function calculateRoute(start, finish) {
         }
 
         const data = await res.json();
-        currentRouteData = data;
-
-        // Metric calculations
-        updateStatsDisplay(data);
-
-        // Map rendering
-        renderRouteOnMap(data);
-
-        // Category cards
-        renderCategoryCards(currentCategory);
-
-        // Update Disha Message
-        const advisory = data.copilot_advisory?.message;
-        if (advisory) {
-            document.getElementById("disha-speech-text").textContent = advisory;
-            currentAudioBase64 = data.copilot_advisory?.audio_base64 || null;
-        }
-
-        // Weather banner
-        const weatherHazards = data.live_weather?.weather_hazards || [];
-        const banner = document.getElementById("road-weather-banner");
-        const weatherText = document.getElementById("weather-text");
-        if (weatherHazards.length > 0) {
-            banner.className = "weather-alert-strip warning";
-            weatherText.textContent = `⚠️ Alert: ${weatherHazards[0].title}. Keep speed steady.`;
-        } else {
-            banner.className = "weather-alert-strip";
-            weatherText.textContent = i18n[currentLang]?.road_clear || "NH highway is clear ahead. Safe journey!";
-        }
+        clientRouteCache.set(cacheKey, data);
+        applyRouteData(data);
 
     } catch (e) {
         console.error("Error calculating route:", e);
@@ -799,27 +852,14 @@ function setDishaVoiceState(state) {
     }
 }
 
-// 12. Send Voice Command to Backend (Sarvam + Bolna)
+// 12. Send Voice Command to Backend (Sarvam + Bolna) with Fast Client Cache
 async function executeVoiceQuery(queryText) {
-    setDishaVoiceState("thinking");
-    try {
-        const start = document.getElementById("start").value || "Delhi";
-        const finish = document.getElementById("finish").value || "Mumbai";
+    const start = document.getElementById("start")?.value || "Delhi";
+    const finish = document.getElementById("finish")?.value || "Mumbai";
+    const cacheKey = `${queryText.trim().toLowerCase()}|${start.trim().toLowerCase()}|${finish.trim().toLowerCase()}|${currentLang}`;
 
-        const res = await fetch(VOICE_API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                query: queryText,
-                start,
-                finish,
-                language: currentLang
-            })
-        });
-
-        const data = await res.json();
+    const applyVoiceData = (data) => {
         const spoken = data.spoken_answer || data.audio_speech_text || "Checked the highway corridor for you.";
-        
         document.getElementById("disha-speech-text").textContent = spoken;
 
         if (data.audio_base64) {
@@ -838,7 +878,33 @@ async function executeVoiceQuery(queryText) {
         else if (data.intent === "hotel_search" || data.intent === "hotel_booking") switchCategory("dhaba");
         else if (data.intent === "mechanic_search" || data.intent === "mechanic_dispatch") switchCategory("mechanic");
         else if (data.intent === "parcel_tracking") switchCategory("cargo");
-        else if (data.intent === "route_and_fuel") switchCategory("fuel");
+        else if (data.intent === "route_and_fuel" || data.intent === "fuel_search") switchCategory("fuel");
+    };
+
+    // Check instant voice query cache
+    const cachedVoice = clientVoiceCache.get(cacheKey);
+    if (cachedVoice) {
+        applyVoiceData(cachedVoice);
+        setDishaVoiceState("idle");
+        return;
+    }
+
+    setDishaVoiceState("thinking");
+    try {
+        const res = await fetch(VOICE_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                query: queryText,
+                start,
+                finish,
+                language: currentLang
+            })
+        });
+
+        const data = await res.json();
+        clientVoiceCache.set(cacheKey, data);
+        applyVoiceData(data);
 
     } catch (e) {
         console.error("Voice query failed:", e);

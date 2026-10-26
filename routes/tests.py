@@ -696,6 +696,44 @@ class NewServicesAndTravelCopilotTests(TestCase):
         self.assertGreater(strategy["estimated_tank_savings_inr"], 1000)
         self.assertIn("बचत", strategy["advisory"])
 
+    def test_voice_query_caching(self):
+        """Tests that repeated voice queries return cached response with X-Cache HIT."""
+        with patch("routes.services.bolna_service.GeocodingService") as mock_geo_cls, \
+             patch("routes.services.bolna_service.RoutingService") as mock_route_cls:
+            mock_geo = mock_geo_cls.return_value
+            mock_geo.geocode.side_effect = [
+                {"longitude": 77.2, "latitude": 28.6, "label": "Delhi"},
+                {"longitude": 72.8, "latitude": 19.0, "label": "Mumbai"},
+            ]
+            mock_route = mock_route_cls.return_value
+            mock_route.get_route.return_value = {
+                "distance_meters": 1400 * 1000,
+                "duration_seconds": 72000,
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[77.2, 28.6], [75.8, 26.9], [72.8, 19.0]],
+                },
+            }
+
+            # First request - MISS
+            res1 = self.client.post(
+                "/api/v1/voice/query/",
+                {"query": "Nearest diesel pump station", "start": "Delhi", "finish": "Mumbai", "language": "en"},
+                format="json",
+            )
+            self.assertEqual(res1.status_code, status.HTTP_200_OK)
+            self.assertEqual(res1.headers.get("X-Cache"), "MISS")
+
+            # Second identical request - HIT (instant response from cache)
+            res2 = self.client.post(
+                "/api/v1/voice/query/",
+                {"query": "Nearest diesel pump station", "start": "Delhi", "finish": "Mumbai", "language": "en"},
+                format="json",
+            )
+            self.assertEqual(res2.status_code, status.HTTP_200_OK)
+            self.assertEqual(res2.headers.get("X-Cache"), "HIT")
+            self.assertEqual(res2.data["spoken_answer"], res1.data["spoken_answer"])
+
 
 
 

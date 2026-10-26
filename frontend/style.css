@@ -131,7 +131,14 @@ html, body {
     align-items: center;
     gap: 8px;
     flex: 1;
-    max-width: 680px;
+    max-width: 840px;
+}
+
+.quick-corridor-chips {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
 }
 
 .input-pill {
