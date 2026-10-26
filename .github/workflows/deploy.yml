@@ -47,13 +47,14 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY || 'fuel-check-copilot' }}
           IMAGE_TAG: ${{ github.sha }}
+          BUILDX_NO_DEFAULT_ATTESTATIONS: 1
         run: |
           # Create ECR repository if it does not exist
           aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" > /dev/null 2>&1 || \
             aws ecr create-repository --repository-name "$ECR_REPOSITORY"
 
-          # Build container image from Dockerfile.lambda (bundles frontend + backend)
-          docker build --platform linux/amd64 -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f Dockerfile.lambda .
+          # Build container image from Dockerfile.lambda (Lambda requires provenance=false)
+          docker build --platform linux/amd64 --provenance=false -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f Dockerfile.lambda .
           docker tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
           # Push both commit SHA tag and latest tag
