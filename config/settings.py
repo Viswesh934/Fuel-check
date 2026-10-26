@@ -58,6 +58,8 @@ ALLOWED_HOSTS = ["*"]
 CSRF_TRUSTED_ORIGINS = [
     "https://*.github.dev",
     "https://*.app.github.dev",
+    "https://*.on.aws",
+    "https://*.amazonaws.com",
     "http://localhost:*",
     "http://127.0.0.1:*",
 ]
@@ -113,10 +115,22 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
+import shutil
+
+# Database: In AWS Lambda, copy sqlite db to writable /tmp
+if os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("IS_LAMBDA"):
+    tmp_db = "/tmp/db.sqlite3"
+    orig_db = BASE_DIR / "db.sqlite3"
+    if not os.path.exists(tmp_db) and orig_db.exists():
+        shutil.copy2(str(orig_db), tmp_db)
+    DB_NAME = tmp_db
+else:
+    DB_NAME = BASE_DIR / "db.sqlite3"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": DB_NAME,
     }
 }
 
