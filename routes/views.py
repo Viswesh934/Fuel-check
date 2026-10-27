@@ -412,3 +412,41 @@ class CopilotSOSView(APIView):
         service = EmergencyService()
         result = service.trigger_emergency_sos(latitude=lat, longitude=lng)
         return Response(result, status=status.HTTP_200_OK)
+
+
+
+from routes.services.manifest_service import TripManifestService
+
+
+class TripManifestExportView(APIView):
+    """
+    Exports a structured commercial waybill & dispatch manifest (Bilti)
+    aggregating route checkpoints, diesel savings, emergency contacts, and active hazards.
+    """
+
+    def post(self, request):
+        route_data = request.data.get("route_data")
+        manifest_service = TripManifestService()
+
+        if route_data and isinstance(route_data, dict):
+            manifest = manifest_service.generate_manifest(route_data)
+            return Response(manifest, status=status.HTTP_200_OK)
+
+        start_loc = request.data.get("start", "Delhi")
+        finish_loc = request.data.get("finish", "Mumbai")
+        language = request.data.get("language", "en")
+
+        cache_key = get_route_cache_key(start_loc, finish_loc, language)
+        cached_response = cache.get(cache_key)
+
+        if cached_response and "data" in cached_response:
+            manifest = manifest_service.generate_manifest(cached_response["data"])
+            return Response(manifest, status=status.HTTP_200_OK)
+
+        opt_view = OptimizeRouteView()
+        opt_res = opt_view.post(request)
+        if opt_res.status_code == status.HTTP_200_OK:
+            manifest = manifest_service.generate_manifest(opt_res.data)
+            return Response(manifest, status=status.HTTP_200_OK)
+
+        return opt_res
