@@ -1,5 +1,7 @@
 # Fuel-Check: Optimal Fuel Stop Planner API
 
+[![CI Pipeline](https://github.com/Viswesh934/Fuel-check/actions/workflows/ci.yml/badge.svg)](https://github.com/Viswesh934/Fuel-check/actions/workflows/ci.yml)
+
 A Django REST Framework service that calculates optimal fuel stops and minimum fuel expenses for long-distance routes across the United States.
 
 ---
@@ -515,3 +517,96 @@ python manage.py runserver
 1. In GitHub Codespaces, go to the **Ports** tab or click **"Open in Browser"** on forwarded port **8000**.
 2. The browser opens the control panel at `/`.
 3. The Service Worker proxy automatically intercepts relative `/api/*` requests on the same domain (`self.location.origin`).
+
+
+---
+
+## 7. Commercial Waybill & Dispatch Manifest (Bilti) API
+
+Commercial freight dispatchers and long-haul truckers require physical or digital consignments ("Bilti") containing route plans, optimal refueling locations with interstate VAT savings, emergency contacts (112 / 1033 NHAI), and live weather hazard warnings.
+
+### Endpoint: `POST /api/v1/routes/manifest/`
+
+#### Request Payload
+```json
+{
+  "start": "Delhi",
+  "finish": "Mumbai",
+  "language": "en"
+}
+```
+
+Alternatively, pass existing optimized telemetry directly from the cockpit:
+```json
+{
+  "route_data": {
+    "route": { ... },
+    "fuel": { ... },
+    "fuel_stops": [ ... ]
+  }
+}
+```
+
+#### Response Structure
+```json
+{
+  "status": "success",
+  "manifest_id": "BLT-20261027-A9F3E1",
+  "generated_at": "2026-10-27T05:30:00Z",
+  "corridor": {
+    "start": "Delhi NCT, India",
+    "finish": "Mumbai, Maharashtra, India",
+    "distance_km": 1413.8,
+    "distance_miles": 878.5,
+    "drive_time_hours": 22.5
+  },
+  "fuel_manifest": {
+    "consumed_liters": 332.5,
+    "estimated_cost_inr": 30174.38,
+    "stops": [
+      {
+        "station_name": "IndianOil Highway Swagat",
+        "city": "Rewari",
+        "state": "HR",
+        "route_mile": 55.4,
+        "price_per_unit": 89.65,
+        "estimated_liters": 151.4
+      }
+    ],
+    "tax_savings_strategy": "Tank up in Haryana (HR) to save approx ₹1,200 vs Maharashtra (MH)."
+  },
+  "emergency_dispatch": {
+    "national_emergency": "112",
+    "nhai_highway_helpline": "1033",
+    "trauma_care": {
+      "name": "District Civil Emergency Hospital",
+      "phone": "108 / 112"
+    },
+    "roadside_mechanic": {
+      "name": "NH Highway Breakdown & Tyre Care",
+      "phone": "1033"
+    }
+  },
+  "printable_waybill": "============================================================\n     FUEL-CHECK COMMERCIAL WAYBILL & DISPATCH MANIFEST\n..."
+}
+```
+
+---
+
+## 8. Automated Testing & Continuous Integration
+
+Fuel-Check includes an automated GitHub Actions CI pipeline and a comprehensive Django test suite covering geometry projection, graph reachability, dynamic programming optimization, Open-Meteo live weather hazard analysis, and commercial waybill export.
+
+### Running Test Suite Locally
+
+```bash
+python manage.py test
+```
+
+### Verified Test Suites
+1. **`RouteGeometryTests`**: Normalization of route coordinates and haversine calculations.
+2. **`StationProjectionTests`**: Euclidean flat-plane station corridor projection and coordinate deduplication.
+3. **`RouteGraphTests` & `OptimizerTests`**: Forward-only reachability DAG construction and dynamic programming cost minimization.
+4. **`WeatherHazardServiceTests`**: Open-Meteo batch coordinate forecasting, ETA time-matching, and severe crosswind / downpour / snow hazard thresholds.
+5. **`TripManifestServiceTests`**: Driver waybill compilation, JSON serialization, and printable ASCII dispatch formatting.
+6. **`NewServicesAndTravelCopilotTests`**: End-to-end integration across voice queries, live fuel arbitrage, hotel booking, and emergency SOS dispatch.
