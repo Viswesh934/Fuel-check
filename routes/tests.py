@@ -839,3 +839,89 @@ class WeatherHazardServiceTests(TestCase):
         self.assertIn("WIND", hazard_types)
         self.assertIn("SNOW", hazard_types)
         self.assertIn("RAIN", hazard_types)
+
+
+
+class TripManifestServiceTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.sample_route_data = {
+            "route": {
+                "distance_miles": 878.5,
+                "duration_minutes": 1350.0,
+                "start": {"label": "Delhi NCT, India"},
+                "finish": {"label": "Mumbai, Maharashtra, India"},
+            },
+            "fuel": {
+                "consumed_gallons": 87.85,
+                "total_cost": 312.45,
+            },
+            "fuel_stops": [
+                {
+                    "name": "Bawal IndianOil Hub",
+                    "city": "Rewari",
+                    "state": "HR",
+                    "route_mile": 55.4,
+                    "retail_price": 89.65,
+                    "price_per_liter": 89.65,
+                    "gallons_to_buy": 40.0,
+                }
+            ],
+            "live_fuel_strategy": {
+                "has_strategy": True,
+                "advisory": "Tank up in Haryana (HR) to save approx ₹1,200 vs Maharashtra (MH).",
+            },
+            "travel_events": {
+                "active_route_alerts": [
+                    {
+                        "type": "WEATHER_HAZARD",
+                        "title": "High Wind Caution",
+                        "severity": "WARNING",
+                        "route_mile": 120.0,
+                        "recommended_action": "Reduce truck speed.",
+                    }
+                ]
+            },
+            "copilot_amenities": {
+                "hospitals": [
+                    {
+                        "name": "Rewari Trauma Hospital",
+                        "phone": "01274-255100",
+                        "city": "Rewari",
+                    }
+                ],
+                "mechanics": [
+                    {
+                        "name": "Highway Tyre Express",
+                        "phone": "9812345678",
+                        "city": "Bawal",
+                    }
+                ],
+            },
+        }
+
+    def test_generate_manifest_structure(self):
+        from routes.services.manifest_service import TripManifestService
+        service = TripManifestService()
+        manifest = service.generate_manifest(self.sample_route_data)
+
+        self.assertEqual(manifest["status"], "success")
+        self.assertTrue(manifest["manifest_id"].startswith("BLT-"))
+        self.assertEqual(manifest["corridor"]["start"], "Delhi NCT, India")
+        self.assertEqual(manifest["corridor"]["finish"], "Mumbai, Maharashtra, India")
+        self.assertAlmostEqual(manifest["corridor"]["distance_km"], 1413.8, delta=1.0)
+        self.assertIn("fuel_manifest", manifest)
+        self.assertIn("emergency_dispatch", manifest)
+        self.assertIn("printable_waybill", manifest)
+        self.assertIn("Rewari Trauma Hospital", manifest["printable_waybill"])
+
+    def test_manifest_export_api_with_payload(self):
+        res = self.client.post(
+            "/api/v1/routes/manifest/",
+            {"route_data": self.sample_route_data},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertIn("printable_waybill", res.data)
+        self.assertIn("manifest_id", res.data)

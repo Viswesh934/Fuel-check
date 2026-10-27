@@ -13,6 +13,7 @@ from .views import (
     CopilotMechanicRequestView,
     CopilotParcelDropView,
     CopilotSOSView,
+    TripManifestExportView,
 )
 
 urlpatterns = [
@@ -25,6 +26,11 @@ urlpatterns = [
         "v1/routes/optimize/",
         OptimizeRouteView.as_view(),
         name="optimize-route",
+    ),
+    path(
+        "v1/routes/manifest/",
+        TripManifestExportView.as_view(),
+        name="trip-manifest-export",
     ),
     path(
         "v1/events/",
