@@ -17,6 +17,7 @@ const HOTEL_BOOK_URL = "/api/v1/copilot/hotels/book/";
 const HOSPITAL_ALERT_URL = "/api/v1/copilot/hospitals/alert/";
 const MECHANIC_REQ_URL = "/api/v1/copilot/mechanics/request/";
 const SOS_URL = "/api/v1/copilot/sos/";
+const MANIFEST_API_URL = "/api/v1/routes/manifest/";
 
 // In-Memory Audio Cache for instant Sarvam voice playback (avoids browser TTS)
 const audioCache = new Map();
@@ -718,7 +719,7 @@ async function calculateRoute(start, finish) {
 
     } catch (e) {
         console.error("Error calculating route:", e);
-        alert("Route update note: " + e.message);
+        showCockpitToast("Route update: " + e.message, "error");
     } finally {
         if (loading) loading.classList.add("hidden");
     }
@@ -1312,3 +1313,80 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initial Indian Highway Route: Delhi -> Mumbai (NH 48)
     calculateRoute("Delhi", "Mumbai");
 });
+
+
+
+// --- Cockpit In-App Toast & Waybill Modal Actions ---
+
+function showCockpitToast(message, type = "info", duration = 4000) {
+    const container = document.getElementById("cockpit-toast-container");
+    if (!container) return;
+    const toast = document.createElement("div");
+    toast.className = `cockpit-toast toast-${type}`;
+    const icon = type === "error" ? "⚠️" : type === "success" ? "✅" : type === "warning" ? "⚡" : "ℹ️";
+    toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(10px)";
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+let currentManifestData = null;
+
+async function openManifestModal() {
+    const modal = document.getElementById("manifest-modal");
+    const preview = document.getElementById("manifest-text-preview");
+    if (!modal || !preview) return;
+
+    modal.classList.remove("hidden");
+    preview.textContent = "Compiling commercial waybill (Bilti) from current route telemetry...";
+
+    try {
+        const start = document.getElementById("start")?.value || "Delhi";
+        const finish = document.getElementById("finish")?.value || "Mumbai";
+        const cacheKey = `${start.trim().toLowerCase()}|${finish.trim().toLowerCase()}|${currentLang}`;
+        const cachedRoute = clientRouteCache.get(cacheKey);
+
+        const payload = cachedRoute ? { route_data: cachedRoute } : { start, finish, language: currentLang };
+        const res = await fetch(MANIFEST_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to export waybill manifest");
+        const data = await res.json();
+        currentManifestData = data;
+        preview.textContent = data.printable_waybill || JSON.stringify(data, null, 2);
+    } catch (e) {
+        preview.textContent = "Unable to load waybill preview. Please calculate a valid route first.\n\nError: " + e.message;
+        showCockpitToast("Manifest preview error: " + e.message, "error");
+    }
+}
+
+function closeManifestModal() {
+    const modal = document.getElementById("manifest-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function closeManifestModalOnBackdrop(e) {
+    if (e.target.id === "manifest-modal") {
+        closeManifestModal();
+    }
+}
+
+function copyManifestText() {
+    const preview = document.getElementById("manifest-text-preview");
+    if (!preview || !preview.textContent) return;
+    navigator.clipboard.writeText(preview.textContent).then(() => {
+        showCockpitToast("Waybill text copied to clipboard!", "success");
+    }).catch(() => {
+        showCockpitToast("Could not access clipboard.", "warning");
+    });
+}
+
+function printManifest() {
+    window.print();
+}

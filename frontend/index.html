@@ -59,7 +59,7 @@
             <option value="Hyderabad">Hyderabad (Telangana)</option>
         </datalist>
 
-        <!-- Right: 4 Supported Languages (EN, हिन्दी, தமிழ், తెలుగు) & SOS -->
+        <!-- Right: 4 Supported Languages (EN, हिन्दी, தமிழ், తెలుగు), Bilti & SOS -->
         <div class="top-actions">
             <div class="lang-selector">
                 <button type="button" class="btn-lang active" data-lang="en" onclick="changeLanguage('en')">EN</button>
@@ -67,6 +67,11 @@
                 <button type="button" class="btn-lang" data-lang="ta" onclick="changeLanguage('ta')">தமிழ்</button>
                 <button type="button" class="btn-lang" data-lang="te" onclick="changeLanguage('te')">తెలుగు</button>
             </div>
+
+            <!-- Commercial Bilti / Waybill Action -->
+            <button type="button" class="btn-manifest" onclick="openManifestModal()" title="View and print commercial waybill">
+                📋 Bilti
+            </button>
 
             <!-- Emergency 112 / 1033 NHAI Hotline -->
             <button type="button" class="btn-sos" onclick="triggerDirectSOS()" data-i18n="sos_btn">
@@ -278,6 +283,27 @@
             </div>
         </div>
     </div>
+
+    <!-- 4. Commercial Waybill & Dispatch Manifest Modal (Bilti) -->
+    <div id="manifest-modal" class="modal-backdrop hidden" onclick="closeManifestModalOnBackdrop(event)">
+        <div class="modal-card manifest-card">
+            <div class="modal-header">
+                <h3>📋 Commercial Waybill & Dispatch Manifest (Bilti)</h3>
+                <button type="button" class="btn-close-modal" onclick="closeManifestModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <pre id="manifest-text-preview" class="manifest-pre">Loading trip manifest...</pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-action" onclick="copyManifestText()">📄 Copy Text</button>
+                <button type="button" class="btn-modal-action btn-primary" onclick="printManifest()">🖨️ Print Waybill</button>
+                <button type="button" class="btn-modal-action" onclick="closeManifestModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Non-Blocking Cockpit Toast Notification Container -->
+    <div id="cockpit-toast-container" class="cockpit-toast-container" aria-live="polite"></div>
 
 </div>
 
