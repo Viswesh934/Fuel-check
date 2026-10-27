@@ -738,3 +738,104 @@ class NewServicesAndTravelCopilotTests(TestCase):
 
 
 
+
+
+class WeatherHazardServiceTests(TestCase):
+    def test_fetch_batch_weather_empty_coords(self):
+        from routes.services.weather_service import fetch_batch_weather
+        res = fetch_batch_weather([])
+        self.assertEqual(res, [])
+
+    @patch("routes.services.weather_service.requests.get")
+    def test_fetch_batch_weather_success(self, mock_get):
+        from routes.services.weather_service import fetch_batch_weather
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                "latitude": 28.5,
+                "longitude": 77.1,
+                "hourly": {
+                    "time": ["2026-10-27T10:00"],
+                    "wind_speed_10m": [15.5],
+                    "rain": [0.1],
+                    "snowfall": [0.0],
+                    "temperature_2m": [65.0],
+                },
+            }
+        ]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        coords = [(77.1, 28.5)]
+        res = fetch_batch_weather(coords)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["hourly"]["wind_speed_10m"], [15.5])
+        mock_get.assert_called_once()
+
+    @patch("routes.services.weather_service.requests.get")
+    def test_fetch_batch_weather_fallback_on_exception(self, mock_get):
+        from routes.services.weather_service import fetch_batch_weather
+        import requests
+        mock_get.side_effect = requests.RequestException("Network timeout")
+
+        coords = [(77.1, 28.5), (75.8, 26.9)]
+        res = fetch_batch_weather(coords)
+        self.assertEqual(len(res), 2)
+        # Should return baseline fallback
+        self.assertEqual(len(res[0]["hourly"]["time"]), 48)
+        self.assertEqual(res[0]["hourly"]["wind_speed_10m"][0], 12.0)
+
+    def test_get_checkpoint_weather_at_eta(self):
+        from routes.services.weather_service import get_checkpoint_weather_at_eta
+        import datetime
+        fc = {
+            "hourly": {
+                "time": ["2026-10-27T10:00", "2026-10-27T11:00"],
+                "wind_speed_10m": [22.4, 38.6],
+                "rain": [0.05, 0.45],
+                "snowfall": [0.0, 0.25],
+                "temperature_2m": [55.0, 31.0],
+            }
+        }
+        eta = datetime.datetime.fromisoformat("2026-10-27T11:15")
+        weather = get_checkpoint_weather_at_eta(fc, eta)
+        self.assertEqual(weather["wind_speed_mph"], 38.6)
+        self.assertEqual(weather["rain_rate_in_hr"], 0.45)
+        self.assertEqual(weather["snow_rate_in_hr"], 0.25)
+        self.assertEqual(weather["temperature_f"], 31.0)
+
+    @patch("routes.services.weather_service.fetch_batch_weather")
+    def test_analyze_route_weather_hazards_detection(self, mock_fetch):
+        from routes.services.weather_service import analyze_route_weather_hazards
+        mock_fetch.return_value = [
+            {
+                "hourly": {
+                    "time": ["2026-10-27T10:00", "2026-10-27T11:00", "2026-10-27T12:00"],
+                    "wind_speed_10m": [36.0, 36.0, 36.0],
+                    "rain": [0.0, 0.0, 0.0],
+                    "snowfall": [0.2, 0.2, 0.2],
+                    "temperature_2m": [28.0, 28.0, 28.0],
+                }
+            },
+            {
+                "hourly": {
+                    "time": ["2026-10-27T10:00", "2026-10-27T11:00", "2026-10-27T12:00"],
+                    "wind_speed_10m": [10.0, 10.0, 10.0],
+                    "rain": [0.55, 0.55, 0.55],
+                    "snowfall": [0.0, 0.0, 0.0],
+                    "temperature_2m": [60.0, 60.0, 60.0],
+                }
+            },
+        ]
+        points = [
+            {"mile": 0.0, "latitude": 28.6, "longitude": 77.2},
+            {"mile": 60.0, "latitude": 27.8, "longitude": 76.5},
+        ]
+        result = analyze_route_weather_hazards(points)
+        self.assertIn("weather_hazards", result)
+        self.assertIn("checkpoints", result)
+        hazards = result["weather_hazards"]
+        hazard_types = [h["id"].split("-")[1] for h in hazards]
+        self.assertIn("WIND", hazard_types)
+        self.assertIn("SNOW", hazard_types)
+        self.assertIn("RAIN", hazard_types)
