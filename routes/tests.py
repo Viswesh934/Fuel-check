@@ -877,7 +877,7 @@ class BolnaWebhookAPITests(TestCase):
         self.assertEqual(res.data["status"], "error")
 
 
-class WeatherHazardServiceTests(TestCase):
+class WeatherHazardServiceAnalysisTests(TestCase):
     def test_analyze_weather_hazards_empty_or_single_point(self):
         from routes.services.weather_service import analyze_route_weather_hazards
         res_empty = analyze_route_weather_hazards([])
@@ -1148,7 +1148,7 @@ class CopilotDomainServicesUnitTests(TestCase):
 
 
 
-class WeatherHazardServiceTests(TestCase):
+class WeatherHazardServiceBatchTests(TestCase):
     def test_fetch_batch_weather_empty_coords(self):
         from routes.services.weather_service import fetch_batch_weather
         res = fetch_batch_weather([])
@@ -1333,3 +1333,65 @@ class TripManifestServiceTests(TestCase):
         self.assertEqual(res.data["status"], "success")
         self.assertIn("printable_waybill", res.data)
         self.assertIn("manifest_id", res.data)
+
+    def test_generate_manifest_empty_route_data_graceful_fallbacks(self):
+        from routes.services.manifest_service import TripManifestService
+        service = TripManifestService()
+        manifest = service.generate_manifest({})
+
+        self.assertEqual(manifest["status"], "success")
+        self.assertTrue(manifest["manifest_id"].startswith("BLT-"))
+        self.assertEqual(manifest["corridor"]["start"], "Origin")
+        self.assertEqual(manifest["corridor"]["finish"], "Destination")
+        self.assertEqual(manifest["corridor"]["distance_km"], 0.0)
+        self.assertEqual(manifest["emergency_dispatch"]["national_emergency"], "112")
+        self.assertEqual(manifest["emergency_dispatch"]["nhai_highway_helpline"], "1033")
+        self.assertEqual(manifest["emergency_dispatch"]["trauma_care"]["phone"], "108 / 112")
+        self.assertEqual(manifest["emergency_dispatch"]["roadside_mechanic"]["phone"], "1033 (NHAI Emergency)")
+        self.assertIn("Single tank corridor; no en-route refueling required", manifest["printable_waybill"])
+        self.assertIn("Highway corridor is clear. Drive safely!", manifest["printable_waybill"])
+
+    def test_manifest_export_api_with_start_and_finish_cache_hit(self):
+        from routes.views import get_route_cache_key
+        cache.clear()
+        cache_key = get_route_cache_key("Delhi", "Mumbai", "en")
+        cache.set(cache_key, {"data": self.sample_route_data, "status": 200}, timeout=3600)
+
+        res = self.client.post(
+            "/api/v1/routes/manifest/",
+            {"start": "Delhi", "finish": "Mumbai", "language": "en"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertIn("manifest_id", res.data)
+        self.assertEqual(res.data["corridor"]["start"], "Delhi NCT, India")
+
+    @patch("routes.views.RoutingService")
+    @patch("routes.views.GeocodingService")
+    def test_manifest_export_api_uncached_triggers_optimization(self, mock_geocoder_cls, mock_router_cls):
+        cache.clear()
+        mock_geocoder = mock_geocoder_cls.return_value
+        mock_geocoder.geocode.side_effect = [
+            {"longitude": 77.2, "latitude": 28.6, "label": "Delhi NCT, India"},
+            {"longitude": 72.8, "latitude": 19.0, "label": "Mumbai, Maharashtra, India"},
+        ]
+        mock_router = mock_router_cls.return_value
+        mock_router.get_route.return_value = {
+            "distance_meters": 1400 * 1000,
+            "duration_seconds": 72000,
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[77.2, 28.6], [75.8, 26.9], [72.8, 19.0]],
+            },
+        }
+
+        res = self.client.post(
+            "/api/v1/routes/manifest/",
+            {"start": "Delhi", "finish": "Mumbai"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertIn("manifest_id", res.data)
+        self.assertIn("printable_waybill", res.data)
