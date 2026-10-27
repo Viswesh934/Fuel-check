@@ -735,6 +735,414 @@ class NewServicesAndTravelCopilotTests(TestCase):
             self.assertEqual(res2.data["spoken_answer"], res1.data["spoken_answer"])
 
 
+class HealthCheckAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_health_check_returns_200_and_expected_payload(self):
+        res = self.client.get("/api/health/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data.get("status"), "ok")
+        self.assertIn("service", res.data)
+        self.assertIn("version", res.data)
+
+    def test_health_check_cors_options(self):
+        res = self.client.options(
+            "/api/health/",
+            HTTP_ORIGIN="http://localhost:3000",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="GET",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
 
 
+class VoiceTTSAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    @patch("routes.views.BedrockAdvisorService")
+    def test_voice_tts_success(self, mock_advisor_cls):
+        mock_advisor = mock_advisor_cls.return_value
+        mock_advisor.generate_speech_audio.return_value = "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+
+        res = self.client.post(
+            "/api/v1/voice/tts/",
+            {"text": "Proceed along NH 48 for 120 km", "language": "en"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertEqual(res.data["text"], "Proceed along NH 48 for 120 km")
+        self.assertEqual(res.data["language"], "en")
+        self.assertIsNotNone(res.data.get("audio_base64"))
+        mock_advisor.generate_speech_audio.assert_called_once_with(
+            "Proceed along NH 48 for 120 km",
+            language="en",
+        )
+
+    @patch("routes.views.BedrockAdvisorService")
+    def test_voice_tts_regional_languages(self, mock_advisor_cls):
+        mock_advisor = mock_advisor_cls.return_value
+        mock_advisor.generate_speech_audio.return_value = "dGVzdC1hdWRpby1ieXRlcw=="
+
+        for lang in ["hi", "te", "ta"]:
+            res = self.client.post(
+                "/api/v1/voice/tts/",
+                {"text": "Sample navigation alert", "language": lang},
+                format="json",
+            )
+            self.assertEqual(res.status_code, status.HTTP_200_OK)
+            self.assertEqual(res.data["language"], lang)
+
+    def test_voice_tts_missing_text_returns_400(self):
+        res = self.client.post(
+            "/api/v1/voice/tts/",
+            {"language": "en"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("text", res.data)
+
+
+class BolnaWebhookAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_bolna_webhook_hotel_tool_dispatch(self):
+        payload = {
+            "tool_name": "book_hotel",
+            "arguments": {
+                "hotel_id": "HTL-5501",
+                "guest_name": "Rajesh Kumar",
+                "rooms": 1,
+            },
+        }
+        res = self.client.post("/api/v1/bolna/webhook/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertEqual(res.data["tool"], "book_hotel")
+        self.assertIn("data", res.data)
+        self.assertEqual(res.data["data"]["status"], "CONFIRMED")
+
+    def test_bolna_webhook_mechanic_tool_dispatch(self):
+        payload = {
+            "name": "request_mechanic",
+            "parameters": {
+                "mechanic_id": "MCH-5501",
+                "issue": "Brake pressure drop",
+            },
+        }
+        res = self.client.post("/api/v1/bolna/webhook/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertEqual(res.data["tool"], "request_mechanic")
+        self.assertEqual(res.data["data"]["status"], "DISPATCHED")
+
+    def test_bolna_webhook_hospital_tool_dispatch(self):
+        payload = {
+            "name": "alert_emergency_room",
+            "parameters": {
+                "hospital_id": "HSP-5501",
+                "condition": "Acute breathlessness",
+            },
+        }
+        res = self.client.post("/api/v1/bolna/webhook/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertEqual(res.data["data"]["status"], "ER_ALERTED_INCOMING")
+
+    def test_bolna_webhook_sos_tool_dispatch(self):
+        payload = {
+            "tool_name": "trigger_emergency_sos",
+            "arguments": {
+                "latitude": 28.5,
+                "longitude": 77.1,
+            },
+        }
+        res = self.client.post("/api/v1/bolna/webhook/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertEqual(res.data["data"]["status"], "ACTIVE_SOS_BROADCAST")
+
+    @patch("routes.views.BolnaVoiceService")
+    def test_bolna_webhook_exception_returns_500(self, mock_bolna_cls):
+        mock_bolna = mock_bolna_cls.return_value
+        mock_bolna.handle_bolna_webhook.side_effect = RuntimeError("Service connection failed")
+
+        res = self.client.post(
+            "/api/v1/bolna/webhook/",
+            {"tool_name": "book_hotel"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(res.data["status"], "error")
+
+
+class WeatherHazardServiceTests(TestCase):
+    def test_analyze_weather_hazards_empty_or_single_point(self):
+        from routes.services.weather_service import analyze_route_weather_hazards
+        res_empty = analyze_route_weather_hazards([])
+        self.assertEqual(res_empty, {"weather_hazards": [], "checkpoints": []})
+
+        res_single = analyze_route_weather_hazards([{"mile": 0.0, "longitude": -87.6, "latitude": 41.8}])
+        self.assertEqual(res_single, {"weather_hazards": [], "checkpoints": []})
+
+    @patch("routes.services.weather_service.fetch_batch_weather")
+    def test_analyze_weather_hazards_high_wind_detection(self, mock_fetch_weather):
+        import datetime
+        from routes.services.weather_service import analyze_route_weather_hazards
+        mock_fetch_weather.return_value = [
+            {
+                "hourly": {
+                    "time": ["2026-10-27T12:00"],
+                    "wind_speed_10m": [45.0],
+                    "rain": [0.0],
+                    "snowfall": [0.0],
+                    "temperature_2m": [60.0],
+                }
+            },
+            {
+                "hourly": {
+                    "time": ["2026-10-27T13:00"],
+                    "wind_speed_10m": [10.0],
+                    "rain": [0.0],
+                    "snowfall": [0.0],
+                    "temperature_2m": [62.0],
+                }
+            },
+        ]
+
+        route_points = [
+            {"mile": 0.0, "longitude": -87.6, "latitude": 41.8},
+            {"mile": 50.0, "longitude": -88.5, "latitude": 41.2},
+        ]
+        dep_time = datetime.datetime(2026, 10, 27, 12, 0, tzinfo=datetime.timezone.utc)
+        result = analyze_route_weather_hazards(route_points, departure_time=dep_time)
+
+        self.assertIn("weather_hazards", result)
+        hazards = result["weather_hazards"]
+        self.assertEqual(len(hazards), 1)
+        self.assertEqual(hazards[0]["type"], "WEATHER_HAZARD")
+        self.assertEqual(hazards[0]["severity"], "CRITICAL")
+        self.assertIn("High Crosswinds", hazards[0]["title"])
+
+    @patch("routes.services.weather_service.fetch_batch_weather")
+    def test_analyze_weather_hazards_heavy_rain_and_snow(self, mock_fetch_weather):
+        import datetime
+        from routes.services.weather_service import analyze_route_weather_hazards
+        mock_fetch_weather.return_value = [
+            {
+                "hourly": {
+                    "time": ["2026-10-27T12:00"],
+                    "wind_speed_10m": [15.0],
+                    "rain": [0.55],
+                    "snowfall": [0.25],
+                    "temperature_2m": [30.0],
+                }
+            },
+        ]
+
+        route_points = [
+            {"mile": 0.0, "longitude": -87.6, "latitude": 41.8},
+            {"mile": 10.0, "longitude": -87.8, "latitude": 41.7},
+        ]
+        dep_time = datetime.datetime(2026, 10, 27, 12, 0, tzinfo=datetime.timezone.utc)
+        result = analyze_route_weather_hazards(route_points, departure_time=dep_time)
+
+        hazards = result["weather_hazards"]
+        hazard_types = [h["id"] for h in hazards]
+        self.assertTrue(any("SNOW" in hid for hid in hazard_types))
+        self.assertTrue(any("RAIN" in hid for hid in hazard_types))
+
+
+class FuelStationModelTests(TestCase):
+    def test_fuel_station_str_representation(self):
+        from decimal import Decimal
+        station = FuelStation.objects.create(
+            opis_truckstop_id=999,
+            name="Flying J Travel Center",
+            address="123 Highway 40",
+            city="Oklahoma City",
+            state="OK",
+            retail_price=Decimal("3.29900"),
+            latitude=35.4676,
+            longitude=-97.5164,
+        )
+        self.assertEqual(str(station), "Flying J Travel Center - Oklahoma City, OK")
+
+    def test_fuel_station_decimal_precision(self):
+        from decimal import Decimal
+        station = FuelStation.objects.create(
+            opis_truckstop_id=1001,
+            name="Pilot Travel Center",
+            address="456 Route 66",
+            city="Flagstaff",
+            state="AZ",
+            retail_price=Decimal("3.89999"),
+            rack_id=45,
+            geocode_status="ROOFTOP",
+            geocode_match_type="EXACT",
+        )
+        saved = FuelStation.objects.get(opis_truckstop_id=1001)
+        self.assertEqual(saved.retail_price, Decimal("3.89999"))
+        self.assertEqual(saved.rack_id, 45)
+        self.assertEqual(saved.geocode_status, "ROOFTOP")
+
+
+class ImportFuelPricesCommandTests(TestCase):
+    def test_import_missing_file_raises_filenotfound(self):
+        from django.core.management import call_command
+        with self.assertRaises(FileNotFoundError):
+            call_command("import_fuel_prices", "non_existent_prices.csv")
+
+    def test_import_valid_csv(self):
+        import csv
+        import tempfile
+        import os
+        from decimal import Decimal
+        from django.core.management import call_command
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="cp1252", newline="") as tmp:
+            writer = csv.writer(tmp)
+            writer.writerow([
+                "OPIS Truckstop ID", "Truckstop Name", "Address", "City", "State", "Rack ID", "Retail Price"
+            ])
+            writer.writerow([
+                "77777", "Test Pilot Express", "100 Interstate Dr", "Barstow", "CA", "12", "4.15900"
+            ])
+            tmp_path = tmp.name
+
+        try:
+            call_command("import_fuel_prices", tmp_path)
+            created = FuelStation.objects.filter(opis_truckstop_id=77777).first()
+            self.assertIsNotNone(created)
+            self.assertEqual(created.name, "Test Pilot Express")
+            self.assertEqual(created.city, "Barstow")
+            self.assertEqual(created.state, "CA")
+            self.assertEqual(created.retail_price, Decimal("4.15900"))
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+
+class OptimizeRouteEdgeCasesTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+
+    @patch("routes.views.RoutingService")
+    @patch("routes.views.GeocodingService")
+    def test_routing_failure_returns_502(self, mock_geocoder_cls, mock_router_cls):
+        mock_geocoder = mock_geocoder_cls.return_value
+        mock_geocoder.geocode.side_effect = [
+            {"longitude": -87.6, "latitude": 41.8, "label": "Chicago, IL"},
+            {"longitude": -92.3, "latitude": 34.7, "label": "Little Rock, AR"},
+        ]
+        mock_router = mock_router_cls.return_value
+        mock_router.get_route.side_effect = ConnectionError("Routing engine unreachable")
+
+        res = self.client.post(
+            "/api/v1/routes/optimize/",
+            {"start": "Chicago, IL", "finish": "Little Rock, AR"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn("error", res.data)
+        self.assertEqual(res.data["error"], "Unable to calculate route.")
+
+
+class LiveFuelRatesAPITests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+
+    def test_live_fuel_rates_get_success(self):
+        res = self.client.get("/api/v1/fuel/rates/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "success")
+        self.assertEqual(res.data["currency"], "INR (₹/L)")
+        self.assertIn("state_rates", res.data)
+        self.assertIn("DL", res.data["state_rates"])
+        self.assertIn("MH", res.data["state_rates"])
+        self.assertGreater(res.data["state_rates"]["DL"]["diesel_inr"], 50.0)
+
+
+class FuelPriceServiceUnitTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_resolve_state_from_coords(self):
+        from routes.services.fuel_price_service import FuelPriceService
+        service = FuelPriceService()
+
+        # Delhi coords
+        self.assertEqual(service.resolve_state_from_coords(28.6139, 77.2090), "DL")
+        # Haryana coords (Manesar/Rewari)
+        self.assertEqual(service.resolve_state_from_coords(28.2500, 76.8000), "HR")
+        # Rajasthan coords
+        self.assertEqual(service.resolve_state_from_coords(26.9124, 75.7873), "RJ")
+        # Gujarat coords
+        self.assertEqual(service.resolve_state_from_coords(23.0225, 72.5714), "GJ")
+        # Maharashtra coords
+        self.assertEqual(service.resolve_state_from_coords(19.0760, 72.8777), "MH")
+
+    def test_fuel_price_service_caching(self):
+        from routes.services.fuel_price_service import FuelPriceService
+        service = FuelPriceService()
+        rates1 = service.get_live_fuel_rates()
+        self.assertIn("DL", rates1)
+
+        # Verify cached hit returns identical dictionary
+        rates2 = service.get_live_fuel_rates()
+        self.assertEqual(rates1, rates2)
+
+
+class CopilotDomainServicesUnitTests(TestCase):
+    def test_parcel_service_tracking_and_drop(self):
+        from routes.services.copilot_services import ParcelService
+        service = ParcelService()
+
+        # Track existing parcel
+        info = service.track_parcel("TRK-IND-8821")
+        self.assertEqual(info["tracking_id"], "TRK-IND-8821")
+        self.assertIn("status", info)
+
+        # Track non-existing parcel falls back gracefully
+        fallback_info = service.track_parcel("NONEXISTENT-999")
+        self.assertIsNotNone(fallback_info["tracking_id"])
+
+        # Confirm drop
+        drop_res = service.confirm_drop("TRK-IND-8821", notes="Dock 4 signoff")
+        self.assertEqual(drop_res["status"], "DELIVERED")
+        self.assertIn("POD-", drop_res["proof_of_delivery"])
+
+    def test_hotel_booking_service(self):
+        from routes.services.copilot_services import HotelBookingService
+        service = HotelBookingService()
+
+        booking = service.book_hotel(hotel_id="HTL-5501", guest_name="Vikram Singh", rooms=2)
+        self.assertEqual(booking["status"], "CONFIRMED")
+        self.assertEqual(booking["guest_name"], "Vikram Singh")
+        self.assertEqual(booking["rooms"], 2)
+        self.assertTrue(booking["confirmation_code"].startswith("HTL-CONF-"))
+
+    def test_mechanic_service_dispatch(self):
+        from routes.services.copilot_services import MechanicService
+        service = MechanicService()
+
+        dispatch = service.request_mechanic(mechanic_id="MCH-5501", issue_type="Alternator failure", current_mile=120.5)
+        self.assertEqual(dispatch["status"], "DISPATCHED")
+        self.assertEqual(dispatch["issue_reported"], "Alternator failure")
+        self.assertEqual(dispatch["mile_location"], 120.5)
+        self.assertTrue(dispatch["dispatch_id"].startswith("MCH-DISP-"))
+
+    def test_emergency_service_trigger(self):
+        from routes.services.copilot_services import EmergencyService
+        service = EmergencyService()
+
+        sos = service.trigger_emergency_sos(latitude=28.7041, longitude=77.1025, location_label="NH 44 Highway")
+        self.assertEqual(sos["status"], "ACTIVE_SOS_BROADCAST")
+        self.assertEqual(sos["coordinates"]["latitude"], 28.7041)
+        self.assertEqual(sos["coordinates"]["longitude"], 77.1025)
+        self.assertGreater(len(sos["dispatched_services"]), 0)
+        self.assertTrue(sos["incident_id"].startswith("SOS-ALERT-"))
 
