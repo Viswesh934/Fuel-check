@@ -17,6 +17,11 @@ class OptimizeRouteSerializer(serializers.Serializer):
         default="en",
     )
 
+    include_audio = serializers.BooleanField(
+        required=False,
+        default=False,
+    )
+
 
 class VoiceQuerySerializer(serializers.Serializer):
     query = serializers.CharField(
@@ -34,6 +39,11 @@ class VoiceQuerySerializer(serializers.Serializer):
     language = serializers.CharField(
         required=False,
         default="en",
+    )
+
+    include_audio = serializers.BooleanField(
+        required=False,
+        default=False,
     )
 
 

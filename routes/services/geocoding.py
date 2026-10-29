@@ -5,8 +5,46 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-# Built-in fast cache / fallback coordinates for common transit hubs & test cities
+# Built-in fast cache / fallback coordinates for Indian freight corridors & test transit hubs
 FALLBACK_LOCATIONS = {
+    # Key Indian Highway Transit Hubs & Freight Corridors
+    "delhi": {"longitude": 77.21688, "latitude": 28.63412, "label": "Delhi NCT, India"},
+    "delhi, india": {"longitude": 77.21688, "latitude": 28.63412, "label": "Delhi NCT, India"},
+    "new delhi": {"longitude": 77.2090, "latitude": 28.6139, "label": "New Delhi, India"},
+    "mumbai": {"longitude": 72.83484, "latitude": 18.94018, "label": "Mumbai, Maharashtra, India"},
+    "mumbai, india": {"longitude": 72.83484, "latitude": 18.94018, "label": "Mumbai, Maharashtra, India"},
+    "bombay": {"longitude": 72.83484, "latitude": 18.94018, "label": "Mumbai, Maharashtra, India"},
+    "jaipur": {"longitude": 75.8203, "latitude": 26.9124, "label": "Jaipur, Rajasthan, India"},
+    "ahmedabad": {"longitude": 72.5714, "latitude": 23.0225, "label": "Ahmedabad, Gujarat, India"},
+    "vadodara": {"longitude": 73.1812, "latitude": 22.3072, "label": "Vadodara, Gujarat, India"},
+    "surat": {"longitude": 72.8311, "latitude": 21.1702, "label": "Surat, Gujarat, India"},
+    "vapi": {"longitude": 72.9289, "latitude": 20.3709, "label": "Vapi, Gujarat, India"},
+    "pune": {"longitude": 73.8567, "latitude": 18.5204, "label": "Pune, Maharashtra, India"},
+    "bengaluru": {"longitude": 77.5946, "latitude": 12.9716, "label": "Bengaluru, Karnataka, India"},
+    "bangalore": {"longitude": 77.5946, "latitude": 12.9716, "label": "Bengaluru, Karnataka, India"},
+    "chennai": {"longitude": 80.2707, "latitude": 13.0827, "label": "Chennai, Tamil Nadu, India"},
+    "madras": {"longitude": 80.2707, "latitude": 13.0827, "label": "Chennai, Tamil Nadu, India"},
+    "hyderabad": {"longitude": 78.4867, "latitude": 17.3850, "label": "Hyderabad, Telangana, India"},
+    "kolkata": {"longitude": 88.3639, "latitude": 22.5726, "label": "Kolkata, West Bengal, India"},
+    "calcutta": {"longitude": 88.3639, "latitude": 22.5726, "label": "Kolkata, West Bengal, India"},
+    "lucknow": {"longitude": 80.9462, "latitude": 26.8467, "label": "Lucknow, Uttar Pradesh, India"},
+    "kanpur": {"longitude": 80.3319, "latitude": 26.4499, "label": "Kanpur, Uttar Pradesh, India"},
+    "nagpur": {"longitude": 79.0882, "latitude": 21.1458, "label": "Nagpur, Maharashtra, India"},
+    "indore": {"longitude": 75.8577, "latitude": 22.7196, "label": "Indore, Madhya Pradesh, India"},
+    "bhopal": {"longitude": 77.4126, "latitude": 23.2599, "label": "Bhopal, Madhya Pradesh, India"},
+    "chandigarh": {"longitude": 76.7794, "latitude": 30.7333, "label": "Chandigarh, India"},
+    "gurugram": {"longitude": 77.0266, "latitude": 28.4595, "label": "Gurugram, Haryana, India"},
+    "gurgaon": {"longitude": 77.0266, "latitude": 28.4595, "label": "Gurugram, Haryana, India"},
+    "rewari": {"longitude": 76.6190, "latitude": 28.1821, "label": "Rewari, Haryana, India"},
+    "ajmer": {"longitude": 74.6399, "latitude": 26.4499, "label": "Ajmer, Rajasthan, India"},
+    "udaipur": {"longitude": 73.7125, "latitude": 24.5854, "label": "Udaipur, Rajasthan, India"},
+    "agra": {"longitude": 78.0081, "latitude": 27.1767, "label": "Agra, Uttar Pradesh, India"},
+    "varanasi": {"longitude": 82.9739, "latitude": 25.3176, "label": "Varanasi, Uttar Pradesh, India"},
+    "coimbatore": {"longitude": 76.9558, "latitude": 11.0168, "label": "Coimbatore, Tamil Nadu, India"},
+    "kochi": {"longitude": 76.2673, "latitude": 9.9312, "label": "Kochi, Kerala, India"},
+    "vijayawada": {"longitude": 80.6480, "latitude": 16.5062, "label": "Vijayawada, Andhra Pradesh, India"},
+    "visakhapatnam": {"longitude": 83.2185, "latitude": 17.6868, "label": "Visakhapatnam, Andhra Pradesh, India"},
+    # Backwards Compatibility for Automated Unit Tests
     "chicago, il": {"longitude": -87.6298, "latitude": 41.8781, "label": "Chicago, IL, USA"},
     "chicago": {"longitude": -87.6298, "latitude": 41.8781, "label": "Chicago, IL, USA"},
     "little rock, ar": {"longitude": -92.2896, "latitude": 34.7465, "label": "Little Rock, AR, USA"},
@@ -88,9 +126,8 @@ class GeocodingService:
                 "q": query,
                 "format": "json",
                 "limit": 1,
-                "countrycodes": "us,ca",
             },
-            timeout=10,
+            timeout=2.5,
         )
 
         if response.status_code != 200:

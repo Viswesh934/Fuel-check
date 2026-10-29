@@ -31,7 +31,7 @@ def geocode_place(query_text: str) -> Tuple[float, float]:
         url = f"https://places.geo.{region}.amazonaws.com/v2/geocode?key={key}"
         data = {"QueryText": cleaned_query, "MaxResults": 1}
         try:
-            res = requests.post(url, json=data, timeout=8)
+            res = requests.post(url, json=data, timeout=2.5)
             if res.status_code == 200:
                 items = res.json().get("ResultItems", [])
                 if items and "Position" in items[0]:
@@ -44,15 +44,30 @@ def geocode_place(query_text: str) -> Tuple[float, float]:
     try:
         city_name = cleaned_query.split(",")[0].strip()
         fallback_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1"
-        res = requests.get(fallback_url, timeout=5).json()
+        res = requests.get(fallback_url, timeout=2.0).json()
         results = res.get("results", [])
         if results:
             return float(results[0]["longitude"]), float(results[0]["latitude"])
     except Exception as e:
         logger.warning(f"Open-Meteo geocoding fallback failed ({e}).")
 
-    # 3. Known US City Hardcoded Fallback Cache
+    # 3. Known Highway City Hardcoded Fallback Cache
     fallbacks = {
+        "delhi": (77.21688, 28.63412),
+        "mumbai": (72.83484, 18.94018),
+        "jaipur": (75.8203, 26.9124),
+        "ahmedabad": (72.5714, 23.0225),
+        "vadodara": (73.1812, 22.3072),
+        "surat": (72.8311, 21.1702),
+        "vapi": (72.9289, 20.3709),
+        "pune": (73.8567, 18.5204),
+        "bengaluru": (77.5946, 12.9716),
+        "chennai": (80.2707, 13.0827),
+        "hyderabad": (78.4867, 17.3850),
+        "kolkata": (88.3639, 22.5726),
+        "lucknow": (80.9462, 26.8467),
+        "rewari": (76.6190, 28.1821),
+        "gurugram": (77.0266, 28.4595),
         "chicago": (-87.6298, 41.8781),
         "little rock": (-92.2896, 34.7465),
         "st. louis": (-90.1994, 38.6270),
@@ -64,8 +79,8 @@ def geocode_place(query_text: str) -> Tuple[float, float]:
         if name in lowered:
             return coords
 
-    # Default fallback (Chicago, IL)
-    return (-87.63245, 41.88425)
+    # Default fallback (Delhi NCT)
+    return (77.21688, 28.63412)
 
 
 def calculate_single_truck_route(
@@ -204,7 +219,7 @@ def search_nearby_places(
         }
 
         try:
-            res = requests.post(url, json=body, timeout=5)
+            res = requests.post(url, json=body, timeout=1.8)
             if res.status_code == 200:
                 items = res.json().get("ResultItems", [])
                 places = []
@@ -215,14 +230,14 @@ def search_nearby_places(
                     city = address_dict.get("Municipality") or address_dict.get("Locality") or address_dict.get("City") or "Corridor"
                     region_data = address_dict.get("Region")
                     if isinstance(region_data, dict):
-                        state = region_data.get("Code") or region_data.get("Name") or "US"
+                        state = region_data.get("Code") or region_data.get("Name") or "IN"
                     elif isinstance(region_data, str):
                         state = region_data
                     else:
-                        state = address_dict.get("State") or "US"
+                        state = address_dict.get("State") or "IN"
                     contacts_dict = item.get("Contacts") or {}
                     phones = contacts_dict.get("Phones") or []
-                    phone = phones[0].get("Value", "+1-800-555-0911") if phones else "+1-800-555-0911"
+                    phone = phones[0].get("Value", "+91-112") if phones else "+91-112"
 
                     places.append({
                         "name": title,
@@ -236,38 +251,9 @@ def search_nearby_places(
                 if places:
                     return places
         except Exception as e:
-            logger.warning(f"AWS Places V2 search-nearby failed ({e}). Attempting open fallback.")
+            logger.debug(f"AWS Places V2 search-nearby skipped ({e}).")
 
-    # 2. Resilient OpenStreetMap POI Fallback (Nominatim)
-    try:
-        query_kw = "hospital emergency" if category == "hospital" else ("hotel motel" if category == "hotel" else "truck repair")
-        osm_url = "https://nominatim.openstreetmap.org/search"
-        params = {
-            "q": query_kw,
-            "format": "json",
-            "lat": coords[1],
-            "lon": coords[0],
-            "radius": radius_meters / 1000.0,
-            "limit": max_results,
-        }
-        res = requests.get(osm_url, params=params, headers={"User-Agent": "FuelCheckCoPilot/2.0"}, timeout=3).json()
-        if isinstance(res, list) and res:
-            osm_places = []
-            for r in res[:max_results]:
-                name = r.get("display_name", f"{category.capitalize()} Facility").split(",")[0]
-                osm_places.append({
-                    "name": name,
-                    "latitude": float(r["lat"]),
-                    "longitude": float(r["lon"]),
-                    "city": "Highway Exit",
-                    "state": "US",
-                    "phone": "+1-800-555-0911",
-                    "source": "OSM_LIVE_POI",
-                })
-            if osm_places:
-                return osm_places
-    except Exception as e:
-        logger.warning(f"OpenStreetMap POI search fallback failed ({e}).")
+    return []
 
     return []
 

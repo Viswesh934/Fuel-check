@@ -649,7 +649,7 @@ function zoomToMarker(lat, lng) {
 }
 
 // 8. Route Calculation Engine with Small LRU & Session Storage Cache
-async function calculateRoute(start, finish) {
+async function calculateRoute(start, finish, isRetry = false) {
     const cleanStart = (start || "Delhi").trim();
     const cleanFinish = (finish || "Mumbai").trim();
     const cacheKey = `${cleanStart.toLowerCase()}|${cleanFinish.toLowerCase()}|${currentLang}`;
@@ -664,6 +664,12 @@ async function calculateRoute(start, finish) {
         if (advisory) {
             document.getElementById("disha-speech-text").textContent = advisory;
             currentAudioBase64 = data.copilot_advisory?.audio_base64 || null;
+            // If audio was not pre-synthesized, fetch on-demand asynchronously in background
+            if (!currentAudioBase64 && advisory) {
+                getOrFetchSarvamAudio(advisory, currentLang).then(b64 => {
+                    if (b64) currentAudioBase64 = b64;
+                }).catch(() => {});
+            }
         }
 
         const weatherHazards = data.live_weather?.weather_hazards || [];
@@ -698,6 +704,13 @@ async function calculateRoute(start, finish) {
         });
 
         if (!res.ok) {
+            // Auto-retry once on 502 / 504 gateway timeout
+            if ((res.status === 502 || res.status === 504) && !isRetry) {
+                console.warn("Backend gateway response 502/504; auto-retrying route query once...");
+                await new Promise(r => setTimeout(r, 1200));
+                return calculateRoute(start, finish, true);
+            }
+
             let errMsg = "Route calculation failed";
             try {
                 const err = await res.json();

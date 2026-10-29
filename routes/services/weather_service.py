@@ -50,7 +50,7 @@ def fetch_batch_weather(
                 OPEN_METEO_FORECAST_URL,
                 params=params,
                 headers=REQUEST_HEADERS,
-                timeout=3,
+                timeout=1.5,
             )
             res.raise_for_status()
             data = res.json()

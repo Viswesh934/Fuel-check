@@ -151,11 +151,16 @@ class OptimizeRouteView(APIView):
             if fuel_strategy.get("has_strategy") and fuel_strategy.get("advisory"):
                 advisory["message"] = f"{advisory['message']} {fuel_strategy['advisory']}"
 
-            # Pre-synthesize high fidelity Indic voice audio
-            audio_b64 = advisor_service.generate_speech_audio(
-                advisory.get("message", ""),
-                language=language,
-            )
+            # Pre-synthesize Indic voice audio only if explicitly requested;
+            # otherwise return immediately for sub-second responses (frontend fetches on-demand via /api/v1/voice/tts/)
+            include_audio = serializer.validated_data.get("include_audio", False)
+            if include_audio:
+                audio_b64 = advisor_service.generate_speech_audio(
+                    advisory.get("message", ""),
+                    language=language,
+                )
+            else:
+                audio_b64 = None
             advisory["audio_base64"] = audio_b64
 
             # Co-Pilot Corridor Amenities: Hotels, Hospitals, Mechanics, Freight Parcels

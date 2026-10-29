@@ -142,7 +142,7 @@ class SarvamAdvisorService:
             "temperature": 0.2,
         }
 
-        resp = requests.post(url, headers=headers, json=payload, timeout=8)
+        resp = requests.post(url, headers=headers, json=payload, timeout=2.5)
         if resp.status_code == 200:
             data = resp.json()
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -273,7 +273,7 @@ class SarvamAdvisorService:
         }
 
         try:
-            res = requests.post(url, headers=headers, json=payload, timeout=8)
+            res = requests.post(url, headers=headers, json=payload, timeout=3.5)
             if res.status_code == 200:
                 audios = res.json().get("audios", [])
                 if audios:
